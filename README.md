@@ -1,2 +1,1 @@
-# unwallet-contracts
-unWallet contracts
+# unWallet contracts

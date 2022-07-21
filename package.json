@@ -1,0 +1,14 @@
+{
+  "name": "unwallet-contracts",
+  "version": "0.1.0",
+  "scripts": {
+    "test": "hardhat test"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^17.0.3",
+    "@commitlint/config-conventional": "^17.0.3",
+    "@nomicfoundation/hardhat-toolbox": "^1.0.2",
+    "hardhat": "^2.10.1",
+    "husky": "^8.0.1"
+  }
+}
