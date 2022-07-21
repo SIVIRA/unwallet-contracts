@@ -7,6 +7,7 @@ import {
   Contract,
   ContractReceipt,
   ContractTransaction,
+  Wallet,
 } from "ethers";
 import { Block } from "@ethersproject/abstract-provider";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -388,6 +389,28 @@ class MetaTxManager {
   }
 }
 
+const randomAddress = (): string => {
+  return ethers.utils.getAddress(
+    ethers.utils.hexlify(ethers.utils.randomBytes(20))
+  );
+};
+
+const randomMethodID = (): string => {
+  return ethers.utils.hexlify(ethers.utils.randomBytes(4));
+};
+
+const randomWallet = (): Wallet => {
+  return ethers.Wallet.createRandom().connect(ethers.provider);
+};
+
+const getLatestBlock = async (): Promise<Block> => {
+  return ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+};
+
+const now = async (): Promise<number> => {
+  return (await getLatestBlock()).timestamp;
+};
+
 const getProxyAddress = async (
   fromAddr: string,
   salt: BytesLike,
@@ -405,24 +428,6 @@ const getProxyAddress = async (
   );
 };
 
-const randomAddress = (): string => {
-  return ethers.utils.getAddress(
-    ethers.utils.hexlify(ethers.utils.randomBytes(20))
-  );
-};
-
-const randomMethodID = (): string => {
-  return ethers.utils.hexlify(ethers.utils.randomBytes(4));
-};
-
-const getLatestBlock = async (): Promise<Block> => {
-  return ethers.provider.getBlock(await ethers.provider.getBlockNumber());
-};
-
-const now = async (): Promise<number> => {
-  return (await getLatestBlock()).timestamp;
-};
-
 const executeContract = async (
   f: Promise<ContractTransaction>
 ): Promise<void> => {
@@ -435,10 +440,11 @@ export {
   ModuleDeployer,
   IdentityProxyDeployer,
   MetaTxManager,
-  getProxyAddress,
   randomAddress,
   randomMethodID,
+  randomWallet,
   getLatestBlock,
   now,
+  getProxyAddress,
   executeContract,
 };
