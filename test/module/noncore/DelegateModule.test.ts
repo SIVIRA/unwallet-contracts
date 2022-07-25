@@ -132,7 +132,7 @@ describe("DelegateModule", () => {
     let digest: string;
 
     before(() => {
-      message = "message to be signed";
+      message = utils.randomString();
       digest = ethers.utils.hashMessage(message);
     });
 

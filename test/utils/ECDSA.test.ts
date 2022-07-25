@@ -16,7 +16,7 @@ describe("ECDSA", () => {
   let testLib: Contract;
 
   before(async () => {
-    message = "message to be signed";
+    message = utils.randomString();
     digest = ethers.utils.hashMessage(message);
 
     [signer1, signer2] = await ethers.getSigners();

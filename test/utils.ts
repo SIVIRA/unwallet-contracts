@@ -107,7 +107,7 @@ class IdentityProxyDeployer extends DeployerBase {
   public async deployProxy(
     ownerAddr: string,
     salt: BytesLike,
-    as: string = "contracts/Proxy.sol:Proxy"
+    as: string = "Proxy"
   ): Promise<Contract> {
     await executeContract(this.factory.createProxy(ownerAddr, salt));
 
@@ -389,6 +389,18 @@ class MetaTxManager {
   }
 }
 
+const randomString = (length: number = 8): string => {
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+  let s = "";
+  for (let i = 0; i < length; i++) {
+    s += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  return s;
+};
+
 const randomAddress = (): string => {
   return ethers.utils.getAddress(
     ethers.utils.hexlify(ethers.utils.randomBytes(20))
@@ -397,10 +409,6 @@ const randomAddress = (): string => {
 
 const randomMethodID = (): string => {
   return ethers.utils.hexlify(ethers.utils.randomBytes(4));
-};
-
-const randomWallet = (): Wallet => {
-  return ethers.Wallet.createRandom().connect(ethers.provider);
 };
 
 const getLatestBlock = async (): Promise<Block> => {
@@ -421,7 +429,7 @@ const getProxyAddress = async (
     salt,
     ethers.utils.keccak256(
       ethers.utils.concat([
-        (await ethers.getContractFactory("contracts/Proxy.sol:Proxy")).bytecode,
+        (await ethers.getContractFactory("Proxy")).bytecode,
         ethers.utils.defaultAbiCoder.encode(["address"], [implAddr]),
       ])
     )
@@ -440,9 +448,9 @@ export {
   ModuleDeployer,
   IdentityProxyDeployer,
   MetaTxManager,
+  randomString,
   randomAddress,
   randomMethodID,
-  randomWallet,
   getLatestBlock,
   now,
   getProxyAddress,
