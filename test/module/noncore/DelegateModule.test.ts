@@ -1,14 +1,15 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-import { Contract, Wallet } from "ethers";
+import { Contract } from "ethers";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import * as constants from "../../constants";
 import * as utils from "../../utils";
 
 describe("DelegateModule", () => {
-  let owner: Wallet;
-  let other: Wallet;
+  let owner: SignerWithAddress;
+  let other: SignerWithAddress;
 
   let identityProxyFactory: Contract;
   let moduleRegistry: Contract;
@@ -20,8 +21,7 @@ describe("DelegateModule", () => {
   let proxy: Contract;
 
   before(async () => {
-    owner = utils.randomWallet();
-    other = utils.randomWallet();
+    [owner, other] = await ethers.getSigners();
   });
 
   beforeEach(async () => {
@@ -128,33 +128,29 @@ describe("DelegateModule", () => {
   });
 
   describe("isValidSignature", () => {
-    let hash: Uint8Array;
+    let message: string;
+    let digest: string;
 
     before(() => {
-      hash = ethers.utils.randomBytes(32);
+      message = "message to be signed";
+      digest = ethers.utils.hashMessage(message);
     });
 
     it("failure: invalid signature length", async () => {
       await expect(
-        proxy.isValidSignature(hash, ethers.utils.randomBytes(64))
+        proxy.isValidSignature(digest, ethers.utils.randomBytes(64))
       ).to.be.revertedWith("DM: invalid signature length");
     });
 
     it("failure: invalid signer", async () => {
       await expect(
-        proxy.isValidSignature(
-          hash,
-          ethers.utils.joinSignature(other._signingKey().signDigest(hash))
-        )
+        proxy.isValidSignature(digest, other.signMessage(message))
       ).to.be.revertedWith("DM: invalid signer");
     });
 
     it("success", async () => {
       expect(
-        await proxy.isValidSignature(
-          hash,
-          ethers.utils.joinSignature(owner._signingKey().signDigest(hash))
-        )
+        await proxy.isValidSignature(digest, owner.signMessage(message))
       ).to.equal(constants.METHOD_ID_ERC1271_IS_VALID_SIGNATURE);
     });
   });

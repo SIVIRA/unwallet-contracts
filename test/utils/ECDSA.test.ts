@@ -1,23 +1,25 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-import { Contract, Wallet } from "ethers";
+import { Contract } from "ethers";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import * as utils from "../utils";
 
 describe("ECDSA", () => {
-  let hash: Uint8Array;
+  let message: string;
+  let digest: string;
 
-  let signer1: Wallet;
-  let signer2: Wallet;
+  let signer1: SignerWithAddress;
+  let signer2: SignerWithAddress;
 
   let testLib: Contract;
 
   before(async () => {
-    hash = ethers.utils.randomBytes(32);
+    message = "message to be signed";
+    digest = ethers.utils.hashMessage(message);
 
-    signer1 = utils.randomWallet();
-    signer2 = utils.randomWallet();
+    [signer1, signer2] = await ethers.getSigners();
   });
 
   beforeEach(async () => {
@@ -28,11 +30,13 @@ describe("ECDSA", () => {
 
   describe("recover(hash, v, r, s)", () => {
     it("success", async () => {
-      const sig = signer1._signingKey().signDigest(hash);
+      const sig = ethers.utils.splitSignature(
+        await signer1.signMessage(message)
+      );
 
       expect(
         await testLib["recover(bytes32,uint8,bytes32,bytes32)"](
-          hash,
+          digest,
           sig.v,
           sig.r,
           sig.s
@@ -45,8 +49,8 @@ describe("ECDSA", () => {
     it("success", async () => {
       expect(
         await testLib["recover(bytes32,bytes)"](
-          hash,
-          ethers.utils.joinSignature(signer1._signingKey().signDigest(hash))
+          digest,
+          signer1.signMessage(message)
         )
       ).to.equal(signer1.address);
     });
@@ -55,21 +59,23 @@ describe("ECDSA", () => {
   describe("recover(hash, sig, index)", () => {
     it("success", async () => {
       const sig = ethers.utils.concat([
-        ethers.utils.joinSignature(signer1._signingKey().signDigest(hash)),
-        ethers.utils.joinSignature(signer2._signingKey().signDigest(hash)),
+        await signer1.signMessage(message),
+        await signer2.signMessage(message),
       ]);
 
       expect(
-        await testLib["recover(bytes32,bytes,uint256)"](hash, sig, 0)
+        await testLib["recover(bytes32,bytes,uint256)"](digest, sig, 0)
       ).to.equal(signer1.address);
       expect(
-        await testLib["recover(bytes32,bytes,uint256)"](hash, sig, 1)
+        await testLib["recover(bytes32,bytes,uint256)"](digest, sig, 1)
       ).to.equal(signer2.address);
     });
   });
 
   describe("toEthSignedMessageHash", () => {
     it("success", async () => {
+      const hash = ethers.utils.randomBytes(32);
+
       expect(await testLib.toEthSignedMessageHash(hash)).to.equal(
         ethers.utils.hashMessage(hash)
       );
