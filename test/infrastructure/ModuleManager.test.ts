@@ -146,7 +146,7 @@ describe("ModuleManager", () => {
   describe("enableDelegation", () => {
     let methodID: string;
 
-    before(() => {
+    beforeEach(() => {
       methodID = utils.randomMethodID();
     });
 
@@ -190,11 +190,9 @@ describe("ModuleManager", () => {
   describe("disableDelegation", () => {
     let methodID: string;
 
-    before(() => {
-      methodID = utils.randomMethodID();
-    });
-
     beforeEach(async () => {
+      methodID = utils.randomMethodID();
+
       await utils.executeContract(
         moduleManager.enableModule(testModule.address)
       );

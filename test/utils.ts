@@ -7,7 +7,6 @@ import {
   Contract,
   ContractReceipt,
   ContractTransaction,
-  Wallet,
 } from "ethers";
 import { Block } from "@ethersproject/abstract-provider";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";

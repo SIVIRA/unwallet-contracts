@@ -131,7 +131,7 @@ describe("DelegateModule", () => {
     let message: string;
     let digest: string;
 
-    before(() => {
+    beforeEach(() => {
       message = utils.randomString();
       digest = ethers.utils.hashMessage(message);
     });

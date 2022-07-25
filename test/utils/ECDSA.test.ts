@@ -16,13 +16,13 @@ describe("ECDSA", () => {
   let testLib: Contract;
 
   before(async () => {
-    message = utils.randomString();
-    digest = ethers.utils.hashMessage(message);
-
     [signer1, signer2] = await ethers.getSigners();
   });
 
   beforeEach(async () => {
+    message = utils.randomString();
+    digest = ethers.utils.hashMessage(message);
+
     const deployer = new utils.Deployer();
 
     testLib = await deployer.deployContract("TestLib");

@@ -138,7 +138,7 @@ describe("Identity", () => {
     });
 
     describe("ERC20.transfer", () => {
-      const totalSupply = 100;
+      const totalSupply: number = 100;
 
       let testERC20: Contract;
 
@@ -146,8 +146,8 @@ describe("Identity", () => {
         const deployer = new utils.Deployer();
 
         testERC20 = await deployer.deployContract("TestERC20", [
-          "Gil",
-          "GIL",
+          "unWallet Coin",
+          "UWC",
           totalSupply,
         ]);
       });
