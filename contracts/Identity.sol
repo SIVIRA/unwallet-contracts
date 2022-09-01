@@ -65,7 +65,6 @@ contract Identity is IIdentity {
         _moduleManager = IModuleManager(newModuleManager);
 
         emit ModuleManagerSwitched(oldModuleManager, newModuleManager);
-        (oldModuleManager, newModuleManager);
     }
 
     function isModuleEnabled(address module)
