@@ -10,6 +10,8 @@ import * as constants from "../constants";
 import * as utils from "../utils";
 
 describe("LockManager", () => {
+  const deployer = new utils.Deployer();
+
   let owner: SignerWithAddress;
 
   let identityProxyFactory: Contract;
@@ -28,8 +30,6 @@ describe("LockManager", () => {
   });
 
   beforeEach(async () => {
-    const deployer = new utils.Deployer();
-
     moduleRegistry = await deployer.deployModuleRegistry();
     moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
     identity = await deployer.deployIdentity(moduleManager.address);

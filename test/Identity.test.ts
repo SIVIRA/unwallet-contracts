@@ -8,12 +8,15 @@ import * as constants from "./constants";
 import * as utils from "./utils";
 
 describe("Identity", () => {
+  const deployer = new utils.Deployer();
+
   let owner: SignerWithAddress;
   let other: SignerWithAddress;
 
   let identityProxyFactory: Contract;
   let moduleRegistry: Contract;
-  let moduleManager: Contract;
+  let moduleManager1: Contract;
+  let moduleManager2: Contract;
 
   let testModule1: Contract;
   let testModule2: Contract;
@@ -26,18 +29,17 @@ describe("Identity", () => {
   });
 
   beforeEach(async () => {
-    const deployer = new utils.Deployer();
-
     moduleRegistry = await deployer.deployModuleRegistry();
-    moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
-    identity = await deployer.deployIdentity(moduleManager.address);
+    moduleManager1 = await deployer.deployModuleManager(moduleRegistry.address);
+    moduleManager2 = await deployer.deployModuleManager(moduleRegistry.address);
+    identity = await deployer.deployIdentity(moduleManager1.address);
     identityProxyFactory = await deployer.deployIdentityProxyFactory(
       identity.address
     );
 
     const moduleDeployer = new utils.ModuleDeployer(
       moduleRegistry,
-      moduleManager
+      moduleManager1
     );
 
     testModule1 = await moduleDeployer.deployModule(
@@ -49,7 +51,7 @@ describe("Identity", () => {
     testModule2 = await moduleDeployer.deployModule("TestModule", [], true);
 
     await utils.executeContract(
-      moduleManager.enableDelegation(
+      moduleManager1.enableDelegation(
         constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE,
         testModule1.address
       )
@@ -75,7 +77,7 @@ describe("Identity", () => {
 
     it("success", async () => {
       expect(await proxy.owner()).to.equal(owner.address);
-      expect(await proxy.moduleManager()).to.equal(moduleManager.address);
+      expect(await proxy.moduleManager()).to.equal(moduleManager1.address);
     });
   });
 
@@ -84,6 +86,12 @@ describe("Identity", () => {
       await expect(
         testModule2.setOwner(proxy.address, other.address)
       ).to.be.revertedWith("I: caller must be an enabled module");
+    });
+
+    it("failure: owner must not be the zero address", async () => {
+      await expect(
+        testModule1.setOwner(proxy.address, ethers.constants.AddressZero)
+      ).to.be.revertedWith("I: owner must not be the zero address");
     });
 
     it("success", async () => {
@@ -102,16 +110,22 @@ describe("Identity", () => {
       ).to.be.revertedWith("I: caller must be an enabled module");
     });
 
-    it("success", async () => {
-      const newModuleManagerAddr = utils.randomAddress();
-
+    it("failure: module manager must be an existing contract address", async () => {
       await expect(
-        testModule1.setModuleManager(proxy.address, newModuleManagerAddr)
+        testModule1.setModuleManager(proxy.address, utils.randomAddress())
+      ).to.be.revertedWith(
+        "I: module manager must be an existing contract address"
+      );
+    });
+
+    it("success", async () => {
+      await expect(
+        testModule1.setModuleManager(proxy.address, moduleManager2.address)
       )
         .to.emit(proxy, "ModuleManagerSwitched")
-        .withArgs(moduleManager.address, newModuleManagerAddr);
+        .withArgs(moduleManager1.address, moduleManager2.address);
 
-      expect(await proxy.moduleManager()).to.equal(newModuleManagerAddr);
+      expect(await proxy.moduleManager()).to.equal(moduleManager2.address);
     });
   });
 
@@ -135,6 +149,12 @@ describe("Identity", () => {
       await expect(
         testModule2.execute(proxy.address, utils.randomAddress(), 0, [])
       ).to.be.revertedWith("I: caller must be an enabled module");
+    });
+
+    it("failure: execution target must not be the zero address", async () => {
+      await expect(
+        testModule1.execute(proxy.address, ethers.constants.AddressZero, 0, [])
+      ).to.be.revertedWith("I: execution target must not be the zero address");
     });
 
     describe("ERC20.transfer", () => {

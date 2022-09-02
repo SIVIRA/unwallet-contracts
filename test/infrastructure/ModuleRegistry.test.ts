@@ -7,6 +7,8 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import * as utils from "../utils";
 
 describe("ModuleRegistry", () => {
+  const deployer = new utils.Deployer();
+
   let owner: SignerWithAddress;
   let other: SignerWithAddress;
 
@@ -20,8 +22,6 @@ describe("ModuleRegistry", () => {
   });
 
   beforeEach(async () => {
-    const deployer = new utils.Deployer();
-
     moduleRegistry = await deployer.deployModuleRegistry();
     moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
 
@@ -38,6 +38,12 @@ describe("ModuleRegistry", () => {
       await expect(
         moduleRegistry.connect(other).registerModule(utils.randomAddress())
       ).to.be.revertedWith("O: caller must be the owner");
+    });
+
+    it("failure: module must be an existing contract address", async () => {
+      await expect(
+        moduleRegistry.registerModule(utils.randomAddress())
+      ).to.be.revertedWith("MR: module must be an existing contract address");
     });
 
     it("success -> failure: registered module", async () => {

@@ -1,12 +1,14 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-import { Contract } from "ethers";
+import { Contract, ContractFactory } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import * as utils from "../utils";
 
 describe("ModuleManager", () => {
+  const deployer = new utils.Deployer();
+
   let owner: SignerWithAddress;
   let other: SignerWithAddress;
 
@@ -20,8 +22,6 @@ describe("ModuleManager", () => {
   });
 
   beforeEach(async () => {
-    const deployer = new utils.Deployer();
-
     moduleRegistry = await deployer.deployModuleRegistry();
     moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
 
@@ -31,6 +31,14 @@ describe("ModuleManager", () => {
     );
 
     testModule = await moduleDeployer.deployModule("TestModule", [], true);
+  });
+
+  describe("constructor", () => {
+    it("failure: registry must be an existing contract address", async () => {
+      await expect(
+        deployer.deployModuleManager(utils.randomAddress())
+      ).to.be.revertedWith("MM: registry must be an existing contract address");
+    });
   });
 
   describe("enableModule", () => {

@@ -4,8 +4,11 @@ pragma solidity 0.8.16;
 import "./base/Ownable.sol";
 import "../interface/IModuleManager.sol";
 import "../interface/IModuleRegistry.sol";
+import "../utils/Address.sol";
 
 contract ModuleManager is Ownable, IModuleManager {
+    using Address for address;
+
     IModuleRegistry internal immutable _registry;
 
     struct ModuleState {
@@ -18,8 +21,8 @@ contract ModuleManager is Ownable, IModuleManager {
 
     constructor(address registry) {
         require(
-            registry != address(0),
-            "MM: registry must not be the zero address"
+            registry.isContract(),
+            "MM: registry must be an existing contract address"
         );
 
         _registry = IModuleRegistry(registry);

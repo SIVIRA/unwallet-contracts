@@ -3,8 +3,11 @@ pragma solidity 0.8.16;
 
 import "./base/Ownable.sol";
 import "../interface/IModuleRegistry.sol";
+import "../utils/Address.sol";
 
 contract ModuleRegistry is Ownable, IModuleRegistry {
+    using Address for address;
+
     mapping(address => bool) internal _modules;
 
     function isModuleRegistered(address module)
@@ -17,6 +20,10 @@ contract ModuleRegistry is Ownable, IModuleRegistry {
     }
 
     function registerModule(address module) external override onlyOwner {
+        require(
+            module.isContract(),
+            "MR: module must be an existing contract address"
+        );
         require(!_modules[module], "MR: registered module");
 
         _modules[module] = true;

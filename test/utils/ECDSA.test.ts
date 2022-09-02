@@ -7,6 +7,8 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import * as utils from "../utils";
 
 describe("ECDSA", () => {
+  const deployer = new utils.Deployer();
+
   let message: string;
   let digest: string;
 
@@ -22,8 +24,6 @@ describe("ECDSA", () => {
   beforeEach(async () => {
     message = utils.randomString();
     digest = ethers.utils.hashMessage(message);
-
-    const deployer = new utils.Deployer();
 
     testLib = await deployer.deployContract("TestLib");
   });

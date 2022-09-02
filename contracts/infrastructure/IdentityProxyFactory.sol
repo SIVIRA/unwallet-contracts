@@ -3,17 +3,20 @@ pragma solidity 0.8.16;
 
 import "./base/Ownable.sol";
 import "../interface/IIdentity.sol";
+import "../utils/Address.sol";
 import "../Proxy.sol";
 
 contract IdentityProxyFactory is Ownable {
+    using Address for address;
+
     address public immutable identityImplementation;
 
     event ProxyCreated(address indexed proxy);
 
     constructor(address identityImpl) {
         require(
-            identityImpl != address(0),
-            "IPF: identity implementation must not be the zero address"
+            identityImpl.isContract(),
+            "IPF: identity implementation must be an existing contract address"
         );
 
         identityImplementation = identityImpl;

@@ -1,12 +1,14 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-import { Contract } from "ethers";
+import { Contract, ContractFactory } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import * as utils from "../utils";
 
 describe("IdentityProxyFactory", () => {
+  const deployer = new utils.Deployer();
+
   let owner: SignerWithAddress;
   let other: SignerWithAddress;
 
@@ -21,8 +23,6 @@ describe("IdentityProxyFactory", () => {
   });
 
   beforeEach(async () => {
-    const deployer = new utils.Deployer();
-
     moduleRegistry = await deployer.deployModuleRegistry();
     moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
     identity = await deployer.deployIdentity(moduleManager.address);
@@ -32,6 +32,14 @@ describe("IdentityProxyFactory", () => {
   });
 
   describe("constructor", () => {
+    it("failure: identity implementation must be an existing contract address", async () => {
+      await expect(
+        deployer.deployIdentityProxyFactory(utils.randomAddress())
+      ).to.be.revertedWith(
+        "IPF: identity implementation must be an existing contract address"
+      );
+    });
+
     it("success", async () => {
       expect(await identityProxyFactory.identityImplementation()).to.equal(
         identity.address

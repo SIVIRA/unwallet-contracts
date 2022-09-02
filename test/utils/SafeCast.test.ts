@@ -6,11 +6,11 @@ import * as constants from "../constants";
 import * as utils from "../utils";
 
 describe("SafeCast", () => {
+  const deployer = new utils.Deployer();
+
   let testLib: Contract;
 
   beforeEach(async () => {
-    const deployer = new utils.Deployer();
-
     testLib = await deployer.deployContract("TestLib");
   });
 

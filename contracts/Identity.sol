@@ -3,8 +3,11 @@ pragma solidity 0.8.16;
 
 import "./interface/IIdentity.sol";
 import "./interface/IModuleManager.sol";
+import "./utils/Address.sol";
 
 contract Identity is IIdentity {
+    using Address for address;
+
     address internal immutable _defaultModuleManager;
 
     bool internal _isInitialized;
@@ -42,6 +45,11 @@ contract Identity is IIdentity {
     }
 
     function _setOwner(address newOwner) internal {
+        require(
+            newOwner != address(0),
+            "I: owner must not be the zero address"
+        );
+
         address oldOwner = owner;
         owner = newOwner;
 
@@ -61,6 +69,11 @@ contract Identity is IIdentity {
     }
 
     function _setModuleManager(address newModuleManager) internal {
+        require(
+            newModuleManager.isContract(),
+            "I: module manager must be an existing contract address"
+        );
+
         address oldModuleManager = address(_moduleManager);
         _moduleManager = IModuleManager(newModuleManager);
 
@@ -90,6 +103,11 @@ contract Identity is IIdentity {
         uint256 value,
         bytes calldata data
     ) external override onlyModule returns (bytes memory) {
+        require(
+            to != address(0),
+            "I: execution target must not be the zero address"
+        );
+
         (bool success, bytes memory result) = to.call{value: value}(data);
         if (!success) {
             assembly {
