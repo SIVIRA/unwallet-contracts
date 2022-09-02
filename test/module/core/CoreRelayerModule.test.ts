@@ -46,7 +46,7 @@ describe("CoreRelayerModule", () => {
 
     module = await moduleDeployer.deployModule(
       "CoreModuleAggregate",
-      [lockManager.address],
+      [lockManager.address, 21000, 27500],
       true,
       true
     );

@@ -5,5 +5,9 @@ import "./CoreBaseModule.sol";
 import "./CoreRelayerModule.sol";
 
 contract CoreModuleAggregate is CoreBaseModule, CoreRelayerModule {
-    constructor(address lockManager) CoreBaseModule(lockManager) {}
+    constructor(
+        address lockManager,
+        uint256 minGas,
+        uint256 refundGas
+    ) CoreBaseModule(lockManager) CoreRelayerModule(minGas, refundGas) {}
 }

@@ -3,7 +3,7 @@ pragma solidity 0.8.16;
 
 import "../../interface/ILockManager.sol";
 
-contract CoreBaseModule {
+abstract contract CoreBaseModule {
     ILockManager internal immutable _lockManager;
 
     constructor(address lockManager) {

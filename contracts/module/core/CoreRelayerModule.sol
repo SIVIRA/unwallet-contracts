@@ -9,6 +9,9 @@ import "../../utils/Math.sol";
 abstract contract CoreRelayerModule is CoreBaseModule {
     using ECDSA for bytes32;
 
+    uint256 internal immutable _minGas;
+    uint256 internal immutable _refundGas;
+
     mapping(address => uint256) internal _nonces;
 
     event Executed(
@@ -25,6 +28,11 @@ abstract contract CoreRelayerModule is CoreBaseModule {
         uint256 amount
     );
 
+    constructor(uint256 minGas, uint256 refundGas) {
+        _minGas = minGas;
+        _refundGas = refundGas;
+    }
+
     function getNonce(address identity) external view returns (uint256) {
         return _nonces[identity];
     }
@@ -37,7 +45,7 @@ abstract contract CoreRelayerModule is CoreBaseModule {
         address refundTo,
         bytes calldata sig
     ) external returns (bool) {
-        uint256 gasInit = gasleft() + 21_000 + msg.data.length * 8;
+        uint256 gasInit = gasleft() + _minGas + msg.data.length * 8;
 
         bytes32 txHash = _getTxHash(
             identity,
@@ -127,7 +135,7 @@ abstract contract CoreRelayerModule is CoreBaseModule {
 
         to = to == address(0) ? msg.sender : to;
 
-        uint256 gasConsumed = gasInit - gasleft() + 28_000;
+        uint256 gasConsumed = gasInit - gasleft() + _refundGas;
         uint256 refundAmount = Math.min(gasConsumed, gasLimit) *
             Math.min(tx.gasprice, gasPrice);
 
