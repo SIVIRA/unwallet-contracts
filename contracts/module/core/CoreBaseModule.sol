@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-pragma solidity ^0.8.4;
+pragma solidity 0.8.16;
 
 import "../../interface/ILockManager.sol";
 
