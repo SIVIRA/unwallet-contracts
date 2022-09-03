@@ -46,9 +46,10 @@ describe("Factory", () => {
         .to.emit(factory, "Created")
         .withArgs(addr);
 
-      const identityProxyFactory = (
-        await ethers.getContractFactory("IdentityProxyFactory")
-      ).attach(addr);
+      const identityProxyFactory = await ethers.getContractAt(
+        "IdentityProxyFactory",
+        addr
+      );
 
       expect(await identityProxyFactory.owner()).to.equal(factory.address);
       expect(await identityProxyFactory.identityImplementation()).to.equal(
@@ -65,9 +66,10 @@ describe("Factory", () => {
         .to.emit(factory, "Created")
         .withArgs(addr);
 
-      const identityProxyFactory = (
-        await ethers.getContractFactory("IdentityProxyFactory")
-      ).attach(addr);
+      const identityProxyFactory = await ethers.getContractAt(
+        "IdentityProxyFactory",
+        addr
+      );
 
       expect(await identityProxyFactory.owner()).to.equal(owner.address);
       expect(await identityProxyFactory.identityImplementation()).to.equal(

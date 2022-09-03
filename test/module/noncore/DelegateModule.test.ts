@@ -18,9 +18,11 @@ describe("DelegateModule", () => {
   let moduleManager: Contract;
 
   let module: Contract;
+  let testModule: Contract;
 
   let identity: Contract;
-  let proxy: Contract;
+  let identityProxy: Contract;
+  let moduleManagerProxy: Contract;
 
   before(async () => {
     [owner, other] = await ethers.getSigners();
@@ -29,21 +31,30 @@ describe("DelegateModule", () => {
   beforeEach(async () => {
     moduleRegistry = await deployer.deployModuleRegistry();
     moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
-    identity = await deployer.deployIdentity(moduleManager.address);
+    identity = await deployer.deployIdentity();
     identityProxyFactory = await deployer.deployIdentityProxyFactory(
       identity.address
     );
 
-    const moduleDeployer = new utils.ModuleDeployer(
-      moduleRegistry,
-      moduleManager
+    const moduleDeployer = new utils.ModuleDeployer(moduleRegistry);
+
+    module = await moduleDeployer.deployModule("DelegateModule", [], true);
+    testModule = await moduleDeployer.deployModule("TestModule", [], true);
+
+    const identityProxyDeployer = new utils.IdentityProxyDeployer(
+      identityProxyFactory
     );
 
-    module = await moduleDeployer.deployModule(
-      "DelegateModule",
-      [],
-      true,
-      true
+    identityProxy = await identityProxyDeployer.deployProxy(
+      owner.address,
+      moduleManager.address,
+      [module.address, testModule.address],
+      ethers.utils.randomBytes(32),
+      "Identity"
+    );
+    moduleManagerProxy = await ethers.getContractAt(
+      "ModuleManager",
+      await identityProxy.moduleManager()
     );
 
     for (const methodID of [
@@ -54,42 +65,50 @@ describe("DelegateModule", () => {
       constants.METHOD_ID_ERC1271_IS_VALID_SIGNATURE,
     ]) {
       await utils.executeContract(
-        moduleManager.enableDelegation(methodID, module.address)
+        testModule.execute(
+          identityProxy.address,
+          moduleManagerProxy.address,
+          0,
+          new ethers.utils.Interface([
+            "function enableDelegation(bytes4 methodID, address module)",
+          ]).encodeFunctionData("enableDelegation", [methodID, module.address])
+        )
       );
     }
 
-    const identityProxyDeployer = new utils.IdentityProxyDeployer(
-      identityProxyFactory
-    );
-
-    proxy = await identityProxyDeployer.deployProxy(
-      owner.address,
-      ethers.utils.randomBytes(32),
-      "DelegateModule"
+    identityProxy = await ethers.getContractAt(
+      "DelegateModule",
+      identityProxy.address
     );
   });
 
   describe("supportsInterface", () => {
     it("success", async () => {
-      expect(await proxy.supportsInterface(constants.INTERFACE_ID_ERC165)).to.be
-        .true;
       expect(
-        await proxy.supportsInterface(constants.INTERFACE_ID_ERC721_RECEIVER)
+        await identityProxy.supportsInterface(constants.INTERFACE_ID_ERC165)
       ).to.be.true;
       expect(
-        await proxy.supportsInterface(constants.INTERFACE_ID_ERC1155_RECEIVER)
+        await identityProxy.supportsInterface(
+          constants.INTERFACE_ID_ERC721_RECEIVER
+        )
       ).to.be.true;
-      expect(await proxy.supportsInterface(constants.INTERFACE_ID_ERC1271)).to
-        .be.true;
-      expect(await proxy.supportsInterface(constants.INTERFACE_ID_ZERO)).to.be
-        .false;
+      expect(
+        await identityProxy.supportsInterface(
+          constants.INTERFACE_ID_ERC1155_RECEIVER
+        )
+      ).to.be.true;
+      expect(
+        await identityProxy.supportsInterface(constants.INTERFACE_ID_ERC1271)
+      ).to.be.true;
+      expect(await identityProxy.supportsInterface(constants.INTERFACE_ID_ZERO))
+        .to.be.false;
     });
   });
 
   describe("onERC721Received", () => {
     it("success", async () => {
       expect(
-        await proxy.onERC721Received(
+        await identityProxy.onERC721Received(
           ethers.constants.AddressZero,
           ethers.constants.AddressZero,
           0,
@@ -102,7 +121,7 @@ describe("DelegateModule", () => {
   describe("onERC1155Received", () => {
     it("success", async () => {
       expect(
-        await proxy.onERC1155Received(
+        await identityProxy.onERC1155Received(
           ethers.constants.AddressZero,
           ethers.constants.AddressZero,
           0,
@@ -116,7 +135,7 @@ describe("DelegateModule", () => {
   describe("onERC1155BatchReceived", () => {
     it("success", async () => {
       expect(
-        await proxy.onERC1155BatchReceived(
+        await identityProxy.onERC1155BatchReceived(
           ethers.constants.AddressZero,
           ethers.constants.AddressZero,
           [],
@@ -138,19 +157,19 @@ describe("DelegateModule", () => {
 
     it("failure: invalid signature length", async () => {
       await expect(
-        proxy.isValidSignature(digest, ethers.utils.randomBytes(64))
+        identityProxy.isValidSignature(digest, ethers.utils.randomBytes(64))
       ).to.be.revertedWith("DM: invalid signature length");
     });
 
     it("failure: invalid signer", async () => {
       await expect(
-        proxy.isValidSignature(digest, other.signMessage(message))
+        identityProxy.isValidSignature(digest, other.signMessage(message))
       ).to.be.revertedWith("DM: invalid signer");
     });
 
     it("success", async () => {
       expect(
-        await proxy.isValidSignature(digest, owner.signMessage(message))
+        await identityProxy.isValidSignature(digest, owner.signMessage(message))
       ).to.equal(constants.METHOD_ID_ERC1271_IS_VALID_SIGNATURE);
     });
   });

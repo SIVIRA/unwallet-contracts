@@ -23,7 +23,8 @@ describe("LockManager", () => {
   let testModule2: Contract;
 
   let identity: Contract;
-  let proxy: Contract;
+  let identityProxy: Contract;
+  let moduleManagerProxy: Contract;
 
   before(async () => {
     [owner] = await ethers.getSigners();
@@ -32,81 +33,82 @@ describe("LockManager", () => {
   beforeEach(async () => {
     moduleRegistry = await deployer.deployModuleRegistry();
     moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
-    identity = await deployer.deployIdentity(moduleManager.address);
+    identity = await deployer.deployIdentity();
     identityProxyFactory = await deployer.deployIdentityProxyFactory(
       identity.address
     );
     lockManager = await deployer.deployLockManager();
 
-    const moduleDeployer = new utils.ModuleDeployer(
-      moduleRegistry,
-      moduleManager
-    );
+    const moduleDeployer = new utils.ModuleDeployer(moduleRegistry);
 
-    testModule1 = await moduleDeployer.deployModule(
-      "TestModule",
-      [],
-      true,
-      true
-    );
+    testModule1 = await moduleDeployer.deployModule("TestModule", [], true);
     testModule2 = await moduleDeployer.deployModule("TestModule", [], true);
 
     const identityProxyDeployer = new utils.IdentityProxyDeployer(
       identityProxyFactory
     );
 
-    proxy = await identityProxyDeployer.deployProxy(
+    identityProxy = await identityProxyDeployer.deployProxy(
       owner.address,
+      moduleManager.address,
+      [testModule1.address],
       ethers.utils.randomBytes(32),
       "Identity"
+    );
+    moduleManagerProxy = await ethers.getContractAt(
+      "ModuleManager",
+      await identityProxy.moduleManager()
     );
   });
 
   describe("lockIdentity", () => {
     it("failure: caller must be an enabled module", async () => {
       await expect(
-        testModule2.lockIdentity(lockManager.address, proxy.address)
+        testModule2.lockIdentity(lockManager.address, identityProxy.address)
       ).to.be.revertedWith("LM: caller must be an enabled module");
     });
 
     it("success -> failure: identity must be unlocked -> expiration", async () => {
-      expect(await lockManager.isIdentityLocked(proxy.address)).to.be.false;
-      expect(await lockManager.getIdentityLockExpireAt(proxy.address)).to.equal(
-        0
-      );
+      expect(await lockManager.isIdentityLocked(identityProxy.address)).to.be
+        .false;
+      expect(
+        await lockManager.getIdentityLockExpireAt(identityProxy.address)
+      ).to.equal(0);
 
       let lockExpireAt: number;
 
       {
         const assertion = expect(
-          testModule1.lockIdentity(lockManager.address, proxy.address)
+          testModule1.lockIdentity(lockManager.address, identityProxy.address)
         ).to.emit(lockManager, "IdentityLocked");
         await assertion;
 
         lockExpireAt = (await utils.now()) + constants.LOCK_PERIOD;
 
         await assertion.withArgs(
-          proxy.address,
+          identityProxy.address,
           testModule1.address,
           lockExpireAt
         );
       }
 
-      expect(await lockManager.isIdentityLocked(proxy.address)).to.be.true;
-      expect(await lockManager.getIdentityLockExpireAt(proxy.address)).to.equal(
-        lockExpireAt
-      );
+      expect(await lockManager.isIdentityLocked(identityProxy.address)).to.be
+        .true;
+      expect(
+        await lockManager.getIdentityLockExpireAt(identityProxy.address)
+      ).to.equal(lockExpireAt);
 
       await expect(
-        testModule1.lockIdentity(lockManager.address, proxy.address)
+        testModule1.lockIdentity(lockManager.address, identityProxy.address)
       ).to.be.revertedWith("LM: identity must be unlocked");
 
       await helpers.time.increase(constants.LOCK_PERIOD);
 
-      expect(await lockManager.isIdentityLocked(proxy.address)).to.be.false;
-      expect(await lockManager.getIdentityLockExpireAt(proxy.address)).to.equal(
-        lockExpireAt
-      );
+      expect(await lockManager.isIdentityLocked(identityProxy.address)).to.be
+        .false;
+      expect(
+        await lockManager.getIdentityLockExpireAt(identityProxy.address)
+      ).to.equal(lockExpireAt);
     });
   });
 
@@ -115,7 +117,7 @@ describe("LockManager", () => {
 
     beforeEach(async () => {
       await utils.executeContract(
-        testModule1.lockIdentity(lockManager.address, proxy.address)
+        testModule1.lockIdentity(lockManager.address, identityProxy.address)
       );
 
       lockExpireAt = (await utils.now()) + constants.LOCK_PERIOD;
@@ -123,17 +125,24 @@ describe("LockManager", () => {
 
     it("failure: caller must be an enabled module", async () => {
       await expect(
-        testModule2.unlockIdentity(lockManager.address, proxy.address)
+        testModule2.unlockIdentity(lockManager.address, identityProxy.address)
       ).to.be.revertedWith("LM: caller must be an enabled module");
     });
 
     it("failure: caller must be the locker", async () => {
       await utils.executeContract(
-        moduleManager.enableModule(testModule2.address)
+        testModule1.execute(
+          identityProxy.address,
+          moduleManagerProxy.address,
+          0,
+          new ethers.utils.Interface([
+            "function enableModule(address module)",
+          ]).encodeFunctionData("enableModule", [testModule2.address])
+        )
       );
 
       await expect(
-        testModule2.unlockIdentity(lockManager.address, proxy.address)
+        testModule2.unlockIdentity(lockManager.address, identityProxy.address)
       ).to.be.revertedWith("LM: caller must be the locker");
     });
 
@@ -141,26 +150,28 @@ describe("LockManager", () => {
       await helpers.time.increase(constants.LOCK_PERIOD);
 
       await expect(
-        testModule1.unlockIdentity(lockManager.address, proxy.address)
+        testModule1.unlockIdentity(lockManager.address, identityProxy.address)
       ).to.be.revertedWith("LM: identity must be locked");
     });
 
     it("success", async () => {
-      expect(await lockManager.isIdentityLocked(proxy.address)).to.be.true;
-      expect(await lockManager.getIdentityLockExpireAt(proxy.address)).to.equal(
-        lockExpireAt
-      );
+      expect(await lockManager.isIdentityLocked(identityProxy.address)).to.be
+        .true;
+      expect(
+        await lockManager.getIdentityLockExpireAt(identityProxy.address)
+      ).to.equal(lockExpireAt);
 
       await expect(
-        testModule1.unlockIdentity(lockManager.address, proxy.address)
+        testModule1.unlockIdentity(lockManager.address, identityProxy.address)
       )
         .to.emit(lockManager, "IdentityUnlocked")
-        .withArgs(proxy.address);
+        .withArgs(identityProxy.address);
 
-      expect(await lockManager.isIdentityLocked(proxy.address)).to.be.false;
-      expect(await lockManager.getIdentityLockExpireAt(proxy.address)).to.equal(
-        0
-      );
+      expect(await lockManager.isIdentityLocked(identityProxy.address)).to.be
+        .false;
+      expect(
+        await lockManager.getIdentityLockExpireAt(identityProxy.address)
+      ).to.equal(0);
     });
   });
 });

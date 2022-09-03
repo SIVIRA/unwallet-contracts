@@ -25,7 +25,7 @@ describe("IdentityProxyFactory", () => {
   beforeEach(async () => {
     moduleRegistry = await deployer.deployModuleRegistry();
     moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
-    identity = await deployer.deployIdentity(moduleManager.address);
+    identity = await deployer.deployIdentity();
     identityProxyFactory = await deployer.deployIdentityProxyFactory(
       identity.address
     );
@@ -66,28 +66,41 @@ describe("IdentityProxyFactory", () => {
       await expect(
         identityProxyFactory
           .connect(other)
-          .createProxy(other.address, ethers.utils.randomBytes(32))
+          .createProxy(
+            other.address,
+            moduleManager.address,
+            [],
+            ethers.utils.randomBytes(32)
+          )
       ).to.be.revertedWith("O: caller must be the owner");
     });
 
     it("success", async () => {
       const salt = ethers.utils.randomBytes(32);
 
-      const proxyAddr = await utils.getProxyAddress(
+      const identityProxyAddr = await utils.getProxyAddress(
         identityProxyFactory.address,
         salt,
         identity.address
       );
 
-      await expect(identityProxyFactory.createProxy(owner.address, salt))
+      await expect(
+        identityProxyFactory.createProxy(
+          owner.address,
+          moduleManager.address,
+          [],
+          salt
+        )
+      )
         .to.emit(identityProxyFactory, "ProxyCreated")
-        .withArgs(proxyAddr);
+        .withArgs(identityProxyAddr);
 
-      const proxy = (await ethers.getContractFactory("Proxy")).attach(
-        proxyAddr
+      const identityProxy = await ethers.getContractAt(
+        "Proxy",
+        identityProxyAddr
       );
 
-      expect(await proxy.implementation()).to.equal(identity.address);
+      expect(await identityProxy.implementation()).to.equal(identity.address);
     });
   });
 });

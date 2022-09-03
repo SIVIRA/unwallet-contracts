@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 pragma solidity 0.8.16;
 
+import "./Proxy.sol";
+import "./infrastructure/ModuleManager.sol";
 import "./interface/IIdentity.sol";
 import "./interface/IModuleManager.sol";
 import "./utils/Address.sol";
 
 contract Identity is IIdentity {
     using Address for address;
-
-    address internal immutable _defaultModuleManager;
 
     bool internal _isInitialized;
     address public override owner;
@@ -22,22 +22,27 @@ contract Identity is IIdentity {
         _;
     }
 
-    constructor(address defaultModuleManager) {
-        require(
-            defaultModuleManager != address(0),
-            "I: module manager must not be the zero address"
-        );
-
-        _defaultModuleManager = defaultModuleManager;
-    }
-
-    function initialize(address initialOwner) external override {
+    function initialize(
+        address initialOwner,
+        address moduleManagerImpl,
+        address[] calldata modules
+    ) external override {
         require(!_isInitialized, "I: contract is already initialized");
 
         _isInitialized = true;
 
+        IModuleManager initialModuleManager = IModuleManager(
+            address(new Proxy(moduleManagerImpl))
+        );
+
+        initialModuleManager.initialize(address(this));
+
+        for (uint256 i = 0; i < modules.length; i++) {
+            initialModuleManager.enableModule(modules[i]);
+        }
+
         _setOwner(initialOwner);
-        _setModuleManager(_defaultModuleManager);
+        _setModuleManager(address(initialModuleManager));
     }
 
     function setOwner(address newOwner) external override onlyModule {
@@ -80,21 +85,11 @@ contract Identity is IIdentity {
         emit ModuleManagerSwitched(oldModuleManager, newModuleManager);
     }
 
-    function isModuleEnabled(address module)
-        external
-        view
-        override
-        returns (bool)
-    {
+    function isModuleEnabled(address module) external view returns (bool) {
         return _moduleManager.isModuleEnabled(module);
     }
 
-    function getDelegate(bytes4 methodID)
-        public
-        view
-        override
-        returns (address)
-    {
+    function getDelegate(bytes4 methodID) public view returns (address) {
         return _moduleManager.getDelegate(methodID);
     }
 

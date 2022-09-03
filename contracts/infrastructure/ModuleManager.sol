@@ -9,6 +9,7 @@ import "../utils/Address.sol";
 contract ModuleManager is Ownable, IModuleManager {
     using Address for address;
 
+    bool internal _isInitialized;
     IModuleRegistry internal immutable _registry;
 
     struct ModuleState {
@@ -25,7 +26,16 @@ contract ModuleManager is Ownable, IModuleManager {
             "MM: registry must be an existing contract address"
         );
 
+        _isInitialized = true;
         _registry = IModuleRegistry(registry);
+    }
+
+    function initialize(address initialOwner) external {
+        require(!_isInitialized, "MM: contract is already initialized");
+
+        _isInitialized = true;
+
+        _setOwner(initialOwner);
     }
 
     function isModuleEnabled(address module)

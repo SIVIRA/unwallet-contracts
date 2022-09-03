@@ -58,36 +58,29 @@ class Deployer extends DeployerBase {
     return this.deployContract("LockManager", [constants.LOCK_PERIOD]);
   }
 
-  public deployIdentity(moduleManagerAddr: string): Promise<Contract> {
-    return this.deployContract("Identity", [moduleManagerAddr]);
+  public deployIdentity(): Promise<Contract> {
+    return this.deployContract("Identity", []);
   }
 }
 
 class ModuleDeployer extends DeployerBase {
   public registry: Contract;
-  public manager: Contract;
 
-  constructor(registry: Contract, manager: Contract) {
+  constructor(registry: Contract) {
     super();
 
     this.registry = registry;
-    this.manager = manager;
   }
 
   public async deployModule(
     name: string,
     args: any[] = [],
-    isRegistered: boolean = false,
-    isEnabeld: boolean = false
+    isRegistered: boolean = false
   ): Promise<Contract> {
     const contract = await this.deployContract(name, args);
 
     if (isRegistered) {
       await executeContract(this.registry.registerModule(contract.address));
-    }
-
-    if (isEnabeld) {
-      await executeContract(this.manager.enableModule(contract.address));
     }
 
     return contract;
@@ -105,10 +98,19 @@ class IdentityProxyDeployer extends DeployerBase {
 
   public async deployProxy(
     ownerAddr: string,
+    moduleManagerImplAddr: string,
+    moduleAddrs: string[],
     salt: BytesLike,
     as: string = "Proxy"
   ): Promise<Contract> {
-    await executeContract(this.factory.createProxy(ownerAddr, salt));
+    await executeContract(
+      this.factory.createProxy(
+        ownerAddr,
+        moduleManagerImplAddr,
+        moduleAddrs,
+        salt
+      )
+    );
 
     return ethers.getContractAt(
       as,

@@ -45,16 +45,15 @@ contract IdentityProxyFactory is Ownable {
             );
     }
 
-    function createProxy(address owner, bytes32 salt)
-        external
-        onlyOwner
-        returns (address)
-    {
-        address payable proxy = payable(
-            new Proxy{salt: salt}(identityImplementation)
-        );
+    function createProxy(
+        address owner,
+        address moduleManagerImpl,
+        address[] calldata modules,
+        bytes32 salt
+    ) external onlyOwner returns (address) {
+        address proxy = address(new Proxy{salt: salt}(identityImplementation));
 
-        IIdentity(proxy).initialize(owner);
+        IIdentity(proxy).initialize(owner, moduleManagerImpl, modules);
 
         emit ProxyCreated(proxy);
 

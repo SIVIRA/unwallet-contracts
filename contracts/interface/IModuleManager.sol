@@ -12,6 +12,8 @@ interface IModuleManager {
 
     event DelegationDisabled(bytes4 indexed methodID);
 
+    function initialize(address initialOwner) external;
+
     function isModuleEnabled(address module) external view returns (bool);
 
     function isModuleFixed(address module) external view returns (bool);

@@ -19,7 +19,11 @@ interface IIdentity {
         bytes data
     );
 
-    function initialize(address initialOwner) external;
+    function initialize(
+        address initialOwner,
+        address moduleManagerImpl,
+        address[] calldata modules
+    ) external;
 
     function owner() external view returns (address);
 

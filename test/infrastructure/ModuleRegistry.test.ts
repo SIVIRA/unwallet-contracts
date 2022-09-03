@@ -25,10 +25,7 @@ describe("ModuleRegistry", () => {
     moduleRegistry = await deployer.deployModuleRegistry();
     moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
 
-    const moduleDeployer = new utils.ModuleDeployer(
-      moduleRegistry,
-      moduleManager
-    );
+    const moduleDeployer = new utils.ModuleDeployer(moduleRegistry);
 
     testModule = await moduleDeployer.deployModule("TestModule");
   });
