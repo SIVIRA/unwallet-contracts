@@ -46,17 +46,50 @@ describe("ECDSA", () => {
   });
 
   describe("recover(hash, sig)", () => {
+    it("failure: invalid signature length", async () => {
+      await expect(
+        testLib["recover(bytes32,bytes)"](
+          digest,
+          (await signer1.signMessage(message)).slice(0, -2)
+        )
+      ).to.be.revertedWith("ECDSA: invalid signature length");
+    });
+
     it("success", async () => {
       expect(
         await testLib["recover(bytes32,bytes)"](
           digest,
-          signer1.signMessage(message)
+          await signer1.signMessage(message)
         )
       ).to.equal(signer1.address);
     });
   });
 
   describe("recover(hash, sig, index)", () => {
+    it("failure: invalid singature length", async () => {
+      const sig = ethers.utils
+        .concat([
+          await signer1.signMessage(message),
+          await signer2.signMessage(message),
+        ])
+        .slice(0, -1);
+
+      await expect(
+        testLib["recover(bytes32,bytes,uint256)"](digest, sig, 0)
+      ).to.be.revertedWith("ECDSA: invalid signature length");
+    });
+
+    it("failure: invalid signature length", async () => {
+      const sig = ethers.utils.concat([
+        await signer1.signMessage(message),
+        await signer2.signMessage(message),
+      ]);
+
+      await expect(
+        testLib["recover(bytes32,bytes,uint256)"](digest, sig, 2)
+      ).to.be.revertedWith("ECDSA: invalid signature index");
+    });
+
     it("success", async () => {
       const sig = ethers.utils.concat([
         await signer1.signMessage(message),
