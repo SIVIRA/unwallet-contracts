@@ -100,6 +100,8 @@ class IdentityProxyDeployer extends DeployerBase {
     ownerAddr: string,
     moduleManagerImplAddr: string,
     moduleAddrs: string[],
+    delegateModuleAddrs: string[],
+    delegateMethodIDs: string[],
     salt: BytesLike,
     as: string = "Proxy"
   ): Promise<Contract> {
@@ -108,6 +110,8 @@ class IdentityProxyDeployer extends DeployerBase {
         ownerAddr,
         moduleManagerImplAddr,
         moduleAddrs,
+        delegateModuleAddrs,
+        delegateMethodIDs,
         salt
       )
     );

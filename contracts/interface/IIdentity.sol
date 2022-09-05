@@ -22,7 +22,9 @@ interface IIdentity {
     function initialize(
         address initialOwner,
         address moduleManagerImpl,
-        address[] calldata modules
+        address[] calldata modules,
+        address[] calldata delegateModules,
+        bytes4[] calldata delegateMethodIDs
     ) external;
 
     function owner() external view returns (address);

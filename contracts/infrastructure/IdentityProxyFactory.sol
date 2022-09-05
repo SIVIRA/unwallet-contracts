@@ -49,11 +49,19 @@ contract IdentityProxyFactory is Ownable {
         address owner,
         address moduleManagerImpl,
         address[] calldata modules,
+        address[] calldata delegateModules,
+        bytes4[] calldata delegateMethodIDs,
         bytes32 salt
     ) external onlyOwner returns (address) {
         address proxy = address(new Proxy{salt: salt}(identityImplementation));
 
-        IIdentity(proxy).initialize(owner, moduleManagerImpl, modules);
+        IIdentity(proxy).initialize(
+            owner,
+            moduleManagerImpl,
+            modules,
+            delegateModules,
+            delegateMethodIDs
+        );
 
         emit ProxyCreated(proxy);
 

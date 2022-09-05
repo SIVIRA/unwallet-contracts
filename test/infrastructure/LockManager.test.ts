@@ -52,6 +52,8 @@ describe("LockManager", () => {
       owner.address,
       moduleManager.address,
       [testModule1.address],
+      [],
+      [],
       ethers.utils.randomBytes(32),
       "Identity"
     );

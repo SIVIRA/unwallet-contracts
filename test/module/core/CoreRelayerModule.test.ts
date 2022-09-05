@@ -56,6 +56,8 @@ describe("CoreRelayerModule", () => {
       owner.address,
       moduleManager.address,
       [module.address, testModule.address],
+      [],
+      [],
       ethers.utils.randomBytes(32),
       "Identity"
     );

@@ -49,6 +49,20 @@ describe("DelegateModule", () => {
       owner.address,
       moduleManager.address,
       [module.address, testModule.address],
+      [
+        module.address,
+        module.address,
+        module.address,
+        module.address,
+        module.address,
+      ],
+      [
+        constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE,
+        constants.METHOD_ID_ERC721_ON_ERC721_RECEIVED,
+        constants.METHOD_ID_ERC1155_ON_ERC1155_RECEIVED,
+        constants.METHOD_ID_ERC1155_ON_ERC1155_BATCH_RECEIVED,
+        constants.METHOD_ID_ERC1271_IS_VALID_SIGNATURE,
+      ],
       ethers.utils.randomBytes(32),
       "Identity"
     );
@@ -56,25 +70,6 @@ describe("DelegateModule", () => {
       "ModuleManager",
       await identityProxy.moduleManager()
     );
-
-    for (const methodID of [
-      constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE,
-      constants.METHOD_ID_ERC721_ON_ERC721_RECEIVED,
-      constants.METHOD_ID_ERC1155_ON_ERC1155_RECEIVED,
-      constants.METHOD_ID_ERC1155_ON_ERC1155_BATCH_RECEIVED,
-      constants.METHOD_ID_ERC1271_IS_VALID_SIGNATURE,
-    ]) {
-      await utils.executeContract(
-        testModule.execute(
-          identityProxy.address,
-          moduleManagerProxy.address,
-          0,
-          new ethers.utils.Interface([
-            "function enableDelegation(bytes4 methodID, address module)",
-          ]).encodeFunctionData("enableDelegation", [methodID, module.address])
-        )
-      );
-    }
 
     identityProxy = await ethers.getContractAt(
       "DelegateModule",

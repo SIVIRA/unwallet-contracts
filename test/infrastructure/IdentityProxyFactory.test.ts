@@ -70,6 +70,8 @@ describe("IdentityProxyFactory", () => {
             other.address,
             moduleManager.address,
             [],
+            [],
+            [],
             ethers.utils.randomBytes(32)
           )
       ).to.be.revertedWith("O: caller must be the owner");
@@ -88,6 +90,8 @@ describe("IdentityProxyFactory", () => {
         identityProxyFactory.createProxy(
           owner.address,
           moduleManager.address,
+          [],
+          [],
           [],
           salt
         )

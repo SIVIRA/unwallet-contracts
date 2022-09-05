@@ -49,6 +49,8 @@ describe("Identity", () => {
       owner.address,
       moduleManager.address,
       [testModule1.address],
+      [testModule1.address],
+      [constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE],
       ethers.utils.randomBytes(32),
       "Identity"
     );
@@ -56,27 +58,38 @@ describe("Identity", () => {
       "ModuleManager",
       await identityProxy.moduleManager()
     );
-
-    await utils.executeContract(
-      testModule1.execute(
-        identityProxy.address,
-        moduleManagerProxy.address,
-        0,
-        new ethers.utils.Interface([
-          "function enableDelegation(bytes4 methodID, address module)",
-        ]).encodeFunctionData("enableDelegation", [
-          constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE,
-          testModule1.address,
-        ])
-      )
-    );
   });
 
   describe("initialize", () => {
     it("failure: contract is already initialized", async () => {
       await expect(
-        identityProxy.initialize(other.address, moduleManager.address, [])
+        identityProxy.initialize(
+          other.address,
+          moduleManager.address,
+          [],
+          [],
+          []
+        )
       ).to.be.revertedWith("I: contract is already initialized");
+    });
+
+    it("failure: delegate modules length and delegate method ids length do not match", async () => {
+      const identityProxyDeployer = new utils.IdentityProxyDeployer(
+        identityProxyFactory
+      );
+
+      await expect(
+        identityProxyDeployer.deployProxy(
+          other.address,
+          moduleManager.address,
+          [testModule1.address],
+          [testModule1.address],
+          [],
+          ethers.utils.randomBytes(32)
+        )
+      ).to.be.revertedWith(
+        "I: delegate modules length and delegate method ids length do not match"
+      );
     });
 
     it("success", async () => {

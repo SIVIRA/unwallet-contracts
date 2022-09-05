@@ -25,9 +25,15 @@ contract Identity is IIdentity {
     function initialize(
         address initialOwner,
         address moduleManagerImpl,
-        address[] calldata modules
+        address[] calldata modules,
+        address[] calldata delegateModules,
+        bytes4[] calldata delegateMethodIDs
     ) external override {
         require(!_isInitialized, "I: contract is already initialized");
+        require(
+            delegateModules.length == delegateMethodIDs.length,
+            "I: delegate modules length and delegate method ids length do not match"
+        );
 
         _isInitialized = true;
 
@@ -39,6 +45,12 @@ contract Identity is IIdentity {
 
         for (uint256 i = 0; i < modules.length; i++) {
             initialModuleManager.enableModule(modules[i]);
+        }
+        for (uint256 j = 0; j < delegateModules.length; j++) {
+            initialModuleManager.enableDelegation(
+                delegateMethodIDs[j],
+                delegateModules[j]
+            );
         }
 
         _setOwner(initialOwner);
