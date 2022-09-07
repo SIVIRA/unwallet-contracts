@@ -2,7 +2,6 @@
 pragma solidity 0.8.16;
 
 import "./Proxy.sol";
-import "./infrastructure/ModuleManager.sol";
 import "./interface/IIdentity.sol";
 import "./interface/IModuleManager.sol";
 import "./utils/Address.sol";
