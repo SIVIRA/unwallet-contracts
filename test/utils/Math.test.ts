@@ -5,11 +5,11 @@ import { Contract } from "ethers";
 import * as utils from "../utils";
 
 describe("Math", () => {
+  const deployer = new utils.Deployer();
+
   let testLib: Contract;
 
   beforeEach(async () => {
-    const deployer = new utils.Deployer();
-
     testLib = await deployer.deployContract("TestLib");
   });
 

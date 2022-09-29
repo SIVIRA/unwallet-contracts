@@ -7,31 +7,31 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import * as utils from "../utils";
 
 describe("Factory", () => {
+  const deployer = new utils.Deployer();
+
   let owner: SignerWithAddress;
 
   let factory: Contract;
+  let dummy: Contract;
 
   before(async () => {
     [owner] = await ethers.getSigners();
   });
 
   beforeEach(async () => {
-    const deployer = new utils.Deployer();
-
     factory = await deployer.deployFactory();
+    dummy = await deployer.deployContract("TestDummy");
   });
 
   describe("create", () => {
-    let identityImplAddr: string;
     let code: Uint8Array;
     let salt: Uint8Array;
     let addr: string;
 
     beforeEach(async () => {
-      identityImplAddr = utils.randomAddress();
       code = ethers.utils.concat([
         (await ethers.getContractFactory("IdentityProxyFactory")).bytecode,
-        ethers.utils.defaultAbiCoder.encode(["address"], [identityImplAddr]),
+        ethers.utils.defaultAbiCoder.encode(["address"], [dummy.address]),
       ]);
       salt = ethers.utils.randomBytes(32);
       addr = ethers.utils.getCreate2Address(
@@ -46,13 +46,14 @@ describe("Factory", () => {
         .to.emit(factory, "Created")
         .withArgs(addr);
 
-      const identityProxyFactory = (
-        await ethers.getContractFactory("IdentityProxyFactory")
-      ).attach(addr);
+      const identityProxyFactory = await ethers.getContractAt(
+        "IdentityProxyFactory",
+        addr
+      );
 
       expect(await identityProxyFactory.owner()).to.equal(factory.address);
       expect(await identityProxyFactory.identityImplementation()).to.equal(
-        identityImplAddr
+        dummy.address
       );
     });
 
@@ -65,13 +66,14 @@ describe("Factory", () => {
         .to.emit(factory, "Created")
         .withArgs(addr);
 
-      const identityProxyFactory = (
-        await ethers.getContractFactory("IdentityProxyFactory")
-      ).attach(addr);
+      const identityProxyFactory = await ethers.getContractAt(
+        "IdentityProxyFactory",
+        addr
+      );
 
       expect(await identityProxyFactory.owner()).to.equal(owner.address);
       expect(await identityProxyFactory.identityImplementation()).to.equal(
-        identityImplAddr
+        dummy.address
       );
     });
   });

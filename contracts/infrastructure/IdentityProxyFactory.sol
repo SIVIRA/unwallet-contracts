@@ -1,19 +1,22 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-pragma solidity ^0.8.4;
+pragma solidity 0.8.16;
 
 import "./base/Ownable.sol";
 import "../interface/IIdentity.sol";
+import "../utils/Address.sol";
 import "../Proxy.sol";
 
 contract IdentityProxyFactory is Ownable {
+    using Address for address;
+
     address public immutable identityImplementation;
 
     event ProxyCreated(address indexed proxy);
 
     constructor(address identityImpl) {
         require(
-            identityImpl != address(0),
-            "IPF: identity implementation must not be the zero address"
+            identityImpl.isContract(),
+            "IPF: identity implementation must be an existing contract address"
         );
 
         identityImplementation = identityImpl;
@@ -42,16 +45,23 @@ contract IdentityProxyFactory is Ownable {
             );
     }
 
-    function createProxy(address owner, bytes32 salt)
-        external
-        onlyOwner
-        returns (address)
-    {
-        address payable proxy = payable(
-            new Proxy{salt: salt}(identityImplementation)
-        );
+    function createProxy(
+        address owner,
+        address moduleManagerImpl,
+        address[] calldata modules,
+        address[] calldata delegateModules,
+        bytes4[] calldata delegateMethodIDs,
+        bytes32 salt
+    ) external onlyOwner returns (address) {
+        address proxy = address(new Proxy{salt: salt}(identityImplementation));
 
-        IIdentity(proxy).initialize(owner);
+        IIdentity(proxy).initialize(
+            owner,
+            moduleManagerImpl,
+            modules,
+            delegateModules,
+            delegateMethodIDs
+        );
 
         emit ProxyCreated(proxy);
 

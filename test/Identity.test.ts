@@ -8,6 +8,8 @@ import * as constants from "./constants";
 import * as utils from "./utils";
 
 describe("Identity", () => {
+  const deployer = new utils.Deployer();
+
   let owner: SignerWithAddress;
   let other: SignerWithAddress;
 
@@ -19,113 +21,162 @@ describe("Identity", () => {
   let testModule2: Contract;
 
   let identity: Contract;
-  let proxy: Contract;
+  let identityProxy: Contract;
+  let moduleManagerProxy: Contract;
 
   before(async () => {
     [owner, other] = await ethers.getSigners();
   });
 
   beforeEach(async () => {
-    const deployer = new utils.Deployer();
-
     moduleRegistry = await deployer.deployModuleRegistry();
     moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
-    identity = await deployer.deployIdentity(moduleManager.address);
+    identity = await deployer.deployIdentity();
     identityProxyFactory = await deployer.deployIdentityProxyFactory(
       identity.address
     );
 
-    const moduleDeployer = new utils.ModuleDeployer(
-      moduleRegistry,
-      moduleManager
-    );
+    const moduleDeployer = new utils.ModuleDeployer(moduleRegistry);
 
-    testModule1 = await moduleDeployer.deployModule(
-      "TestModule",
-      [],
-      true,
-      true
-    );
+    testModule1 = await moduleDeployer.deployModule("TestModule", [], true);
     testModule2 = await moduleDeployer.deployModule("TestModule", [], true);
-
-    await utils.executeContract(
-      moduleManager.enableDelegation(
-        constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE,
-        testModule1.address
-      )
-    );
 
     const identityProxyDeployer = new utils.IdentityProxyDeployer(
       identityProxyFactory
     );
 
-    proxy = await identityProxyDeployer.deployProxy(
+    identityProxy = await identityProxyDeployer.deployProxy(
       owner.address,
+      moduleManager.address,
+      [testModule1.address],
+      [testModule1.address],
+      [constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE],
       ethers.utils.randomBytes(32),
       "Identity"
+    );
+    moduleManagerProxy = await ethers.getContractAt(
+      "ModuleManager",
+      await identityProxy.moduleManager()
     );
   });
 
   describe("initialize", () => {
     it("failure: contract is already initialized", async () => {
-      await expect(proxy.initialize(other.address)).to.be.revertedWith(
-        "I: contract is already initialized"
+      await expect(
+        identityProxy.initialize(
+          other.address,
+          moduleManager.address,
+          [],
+          [],
+          []
+        )
+      ).to.be.revertedWith("I: contract is already initialized");
+    });
+
+    it("failure: delegate modules length and delegate method ids length do not match", async () => {
+      const identityProxyDeployer = new utils.IdentityProxyDeployer(
+        identityProxyFactory
+      );
+
+      await expect(
+        identityProxyDeployer.deployProxy(
+          other.address,
+          moduleManager.address,
+          [testModule1.address],
+          [testModule1.address],
+          [],
+          ethers.utils.randomBytes(32)
+        )
+      ).to.be.revertedWith(
+        "I: delegate modules length and delegate method ids length do not match"
       );
     });
 
     it("success", async () => {
-      expect(await proxy.owner()).to.equal(owner.address);
-      expect(await proxy.moduleManager()).to.equal(moduleManager.address);
+      expect(await identityProxy.owner()).to.equal(owner.address);
+      expect(await identityProxy.moduleManager()).to.equal(
+        moduleManagerProxy.address
+      );
     });
   });
 
   describe("setOwner", () => {
     it("failure: caller must be an enabled module", async () => {
       await expect(
-        testModule2.setOwner(proxy.address, other.address)
+        testModule2.setOwner(identityProxy.address, other.address)
       ).to.be.revertedWith("I: caller must be an enabled module");
     });
 
+    it("failure: owner must not be the zero address", async () => {
+      await expect(
+        testModule1.setOwner(
+          identityProxy.address,
+          ethers.constants.AddressZero
+        )
+      ).to.be.revertedWith("I: owner must not be the zero address");
+    });
+
     it("success", async () => {
-      await expect(testModule1.setOwner(proxy.address, other.address))
-        .to.emit(proxy, "OwnershipTransferred")
+      await expect(testModule1.setOwner(identityProxy.address, other.address))
+        .to.emit(identityProxy, "OwnershipTransferred")
         .withArgs(owner.address, other.address);
 
-      expect(await proxy.owner()).to.equal(other.address);
+      expect(await identityProxy.owner()).to.equal(other.address);
     });
   });
 
   describe("setModuleManager", () => {
     it("failure: caller must be an enabled module", async () => {
       await expect(
-        testModule2.setModuleManager(proxy.address, utils.randomAddress())
+        testModule2.setModuleManager(
+          identityProxy.address,
+          utils.randomAddress()
+        )
       ).to.be.revertedWith("I: caller must be an enabled module");
     });
 
-    it("success", async () => {
-      const newModuleManagerAddr = utils.randomAddress();
-
+    it("failure: module manager must be an existing contract address", async () => {
       await expect(
-        testModule1.setModuleManager(proxy.address, newModuleManagerAddr)
-      )
-        .to.emit(proxy, "ModuleManagerSwitched")
-        .withArgs(moduleManager.address, newModuleManagerAddr);
+        testModule1.setModuleManager(
+          identityProxy.address,
+          utils.randomAddress()
+        )
+      ).to.be.revertedWith(
+        "I: module manager must be an existing contract address"
+      );
+    });
 
-      expect(await proxy.moduleManager()).to.equal(newModuleManagerAddr);
+    it("success", async () => {
+      await expect(
+        testModule1.setModuleManager(
+          identityProxy.address,
+          moduleManager.address
+        )
+      )
+        .to.emit(identityProxy, "ModuleManagerSwitched")
+        .withArgs(moduleManagerProxy.address, moduleManager.address);
+
+      expect(await identityProxy.moduleManager()).to.equal(
+        moduleManager.address
+      );
     });
   });
 
   describe("isModuleEnabled", () => {
     it("success", async () => {
-      expect(await proxy.isModuleEnabled(testModule1.address)).to.be.true;
-      expect(await proxy.isModuleEnabled(testModule2.address)).to.be.false;
+      expect(await identityProxy.isModuleEnabled(testModule1.address)).to.be
+        .true;
+      expect(await identityProxy.isModuleEnabled(testModule2.address)).to.be
+        .false;
     });
   });
 
   describe("getDelegate", () => {
     it("success", async () => {
       expect(
-        await proxy.getDelegate(constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE)
+        await identityProxy.getDelegate(
+          constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE
+        )
       ).to.equal(testModule1.address);
     });
   });
@@ -133,8 +184,19 @@ describe("Identity", () => {
   describe("execute", () => {
     it("failure: caller must be an enabled module", async () => {
       await expect(
-        testModule2.execute(proxy.address, utils.randomAddress(), 0, [])
+        testModule2.execute(identityProxy.address, utils.randomAddress(), 0, [])
       ).to.be.revertedWith("I: caller must be an enabled module");
+    });
+
+    it("failure: execution target must not be the zero address", async () => {
+      await expect(
+        testModule1.execute(
+          identityProxy.address,
+          ethers.constants.AddressZero,
+          0,
+          []
+        )
+      ).to.be.revertedWith("I: execution target must not be the zero address");
     });
 
     describe("ERC20.transfer", () => {
@@ -153,7 +215,7 @@ describe("Identity", () => {
       });
 
       it("failure: transfer amount exceeds balance", async () => {
-        expect(await testERC20.balanceOf(proxy.address)).to.equal(0);
+        expect(await testERC20.balanceOf(identityProxy.address)).to.equal(0);
 
         const data = testERC20.interface.encodeFunctionData("transfer", [
           owner.address,
@@ -161,17 +223,19 @@ describe("Identity", () => {
         ]);
 
         await expect(
-          testModule1.execute(proxy.address, testERC20.address, 0, data)
+          testModule1.execute(identityProxy.address, testERC20.address, 0, data)
         ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
       });
 
       it("success", async () => {
         await utils.executeContract(
-          testERC20.transfer(proxy.address, totalSupply)
+          testERC20.transfer(identityProxy.address, totalSupply)
         );
 
         expect(await testERC20.balanceOf(owner.address)).to.equal(0);
-        expect(await testERC20.balanceOf(proxy.address)).to.equal(totalSupply);
+        expect(await testERC20.balanceOf(identityProxy.address)).to.equal(
+          totalSupply
+        );
 
         const data = testERC20.interface.encodeFunctionData("transfer", [
           owner.address,
@@ -179,43 +243,49 @@ describe("Identity", () => {
         ]);
 
         await expect(
-          testModule1.execute(proxy.address, testERC20.address, 0, data)
+          testModule1.execute(identityProxy.address, testERC20.address, 0, data)
         )
-          .to.emit(proxy, "Executed")
+          .to.emit(identityProxy, "Executed")
           .withArgs(testModule1.address, testERC20.address, 0, data);
 
         expect(await testERC20.balanceOf(owner.address)).to.equal(totalSupply);
-        expect(await testERC20.balanceOf(proxy.address)).to.equal(0);
+        expect(await testERC20.balanceOf(identityProxy.address)).to.equal(0);
       });
     });
   });
 
   describe("fallback", () => {
     beforeEach(async () => {
-      proxy = (await ethers.getContractFactory("TestModule")).attach(
-        proxy.address
+      identityProxy = await ethers.getContractAt(
+        "TestModule",
+        identityProxy.address
       );
     });
 
     it("success", async () => {
-      expect(await proxy.supportsInterface(constants.INTERFACE_ID_ERC165)).to.be
-        .true;
+      expect(
+        await identityProxy.supportsInterface(constants.INTERFACE_ID_ERC165)
+      ).to.be.true;
     });
   });
 
   describe("receive", () => {
     it("success", async () => {
-      expect(await ethers.provider.getBalance(proxy.address)).to.equal(0);
+      expect(await ethers.provider.getBalance(identityProxy.address)).to.equal(
+        0
+      );
 
       {
         const tx = await owner.sendTransaction({
-          to: proxy.address,
+          to: identityProxy.address,
           value: 1,
         });
         await tx.wait();
       }
 
-      expect(await ethers.provider.getBalance(proxy.address)).to.equal(1);
+      expect(await ethers.provider.getBalance(identityProxy.address)).to.equal(
+        1
+      );
     });
   });
 });

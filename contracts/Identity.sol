@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-pragma solidity ^0.8.4;
+pragma solidity 0.8.16;
 
+import "./Proxy.sol";
 import "./interface/IIdentity.sol";
 import "./interface/IModuleManager.sol";
+import "./utils/Address.sol";
 
 contract Identity is IIdentity {
-    address internal immutable _defaultModuleManager;
+    using Address for address;
 
     bool internal _isInitialized;
     address public override owner;
@@ -19,22 +21,39 @@ contract Identity is IIdentity {
         _;
     }
 
-    constructor(address defaultModuleManager) {
-        require(
-            defaultModuleManager != address(0),
-            "I: module manager must not be the zero address"
-        );
-
-        _defaultModuleManager = defaultModuleManager;
-    }
-
-    function initialize(address initialOwner) external override {
+    function initialize(
+        address initialOwner,
+        address moduleManagerImpl,
+        address[] calldata modules,
+        address[] calldata delegateModules,
+        bytes4[] calldata delegateMethodIDs
+    ) external override {
         require(!_isInitialized, "I: contract is already initialized");
+        require(
+            delegateModules.length == delegateMethodIDs.length,
+            "I: delegate modules length and delegate method ids length do not match"
+        );
 
         _isInitialized = true;
 
+        IModuleManager initialModuleManager = IModuleManager(
+            address(new Proxy(moduleManagerImpl))
+        );
+
+        initialModuleManager.initialize(address(this));
+
+        for (uint256 i = 0; i < modules.length; i++) {
+            initialModuleManager.enableModule(modules[i]);
+        }
+        for (uint256 j = 0; j < delegateModules.length; j++) {
+            initialModuleManager.enableDelegation(
+                delegateMethodIDs[j],
+                delegateModules[j]
+            );
+        }
+
         _setOwner(initialOwner);
-        _setModuleManager(_defaultModuleManager);
+        _setModuleManager(address(initialModuleManager));
     }
 
     function setOwner(address newOwner) external override onlyModule {
@@ -42,6 +61,11 @@ contract Identity is IIdentity {
     }
 
     function _setOwner(address newOwner) internal {
+        require(
+            newOwner != address(0),
+            "I: owner must not be the zero address"
+        );
+
         address oldOwner = owner;
         owner = newOwner;
 
@@ -61,28 +85,22 @@ contract Identity is IIdentity {
     }
 
     function _setModuleManager(address newModuleManager) internal {
+        require(
+            newModuleManager.isContract(),
+            "I: module manager must be an existing contract address"
+        );
+
         address oldModuleManager = address(_moduleManager);
         _moduleManager = IModuleManager(newModuleManager);
 
         emit ModuleManagerSwitched(oldModuleManager, newModuleManager);
-        (oldModuleManager, newModuleManager);
     }
 
-    function isModuleEnabled(address module)
-        external
-        view
-        override
-        returns (bool)
-    {
+    function isModuleEnabled(address module) external view returns (bool) {
         return _moduleManager.isModuleEnabled(module);
     }
 
-    function getDelegate(bytes4 methodID)
-        public
-        view
-        override
-        returns (address)
-    {
+    function getDelegate(bytes4 methodID) public view returns (address) {
         return _moduleManager.getDelegate(methodID);
     }
 
@@ -91,6 +109,11 @@ contract Identity is IIdentity {
         uint256 value,
         bytes calldata data
     ) external override onlyModule returns (bytes memory) {
+        require(
+            to != address(0),
+            "I: execution target must not be the zero address"
+        );
+
         (bool success, bytes memory result) = to.call{value: value}(data);
         if (!success) {
             assembly {

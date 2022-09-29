@@ -1,10 +1,19 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-pragma solidity ^0.8.4;
+pragma solidity 0.8.16;
+
+import "./utils/Address.sol";
 
 contract Proxy {
+    using Address for address;
+
     address public immutable implementation;
 
     constructor(address impl) {
+        require(
+            impl.isContract(),
+            "P: implementation must be an existing contract address"
+        );
+
         implementation = impl;
     }
 

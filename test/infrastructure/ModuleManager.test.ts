@@ -1,12 +1,14 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-import { Contract } from "ethers";
+import { Contract, ContractFactory } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import * as utils from "../utils";
 
 describe("ModuleManager", () => {
+  const deployer = new utils.Deployer();
+
   let owner: SignerWithAddress;
   let other: SignerWithAddress;
 
@@ -20,17 +22,46 @@ describe("ModuleManager", () => {
   });
 
   beforeEach(async () => {
-    const deployer = new utils.Deployer();
-
     moduleRegistry = await deployer.deployModuleRegistry();
     moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
 
-    const moduleDeployer = new utils.ModuleDeployer(
-      moduleRegistry,
-      moduleManager
-    );
+    const moduleDeployer = new utils.ModuleDeployer(moduleRegistry);
 
     testModule = await moduleDeployer.deployModule("TestModule", [], true);
+  });
+
+  describe("constructor", () => {
+    it("failure: registry must be an existing contract address", async () => {
+      await expect(
+        deployer.deployModuleManager(utils.randomAddress())
+      ).to.be.revertedWith("MM: registry must be an existing contract address");
+    });
+  });
+
+  describe("initialize", () => {
+    it("failure: contract is already initialized", async () => {
+      await expect(moduleManager.initialize(other.address)).to.be.revertedWith(
+        "MM: contract is already initialized"
+      );
+    });
+
+    it("success -> failure: contract is already initialized", async () => {
+      let moduleManagerProxy = await deployer.deployContract("Proxy", [
+        moduleManager.address,
+      ]);
+      moduleManagerProxy = await ethers.getContractAt(
+        "ModuleManager",
+        moduleManagerProxy.address
+      );
+
+      await moduleManagerProxy.initialize(owner.address);
+
+      expect(await moduleManagerProxy.owner()).to.equal(owner.address);
+
+      await expect(
+        moduleManagerProxy.initialize(other.address)
+      ).to.be.revertedWith("MM: contract is already initialized");
+    });
   });
 
   describe("enableModule", () => {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.4;
+pragma solidity 0.8.16;
 
 library ECDSA {
     function recover(
@@ -28,6 +28,8 @@ library ECDSA {
         pure
         returns (address)
     {
+        require(sig.length == 65, "ECDSA: invalid signature length");
+
         bytes32 r;
         bytes32 s;
         uint8 v;
@@ -46,6 +48,9 @@ library ECDSA {
         bytes memory sig,
         uint256 index
     ) internal pure returns (address) {
+        require(sig.length % 65 == 0, "ECDSA: invalid signature length");
+        require(index < sig.length / 65, "ECDSA: invalid signature index");
+
         bytes32 r;
         bytes32 s;
         uint8 v;

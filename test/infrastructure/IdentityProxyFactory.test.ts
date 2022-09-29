@@ -1,12 +1,14 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-import { Contract } from "ethers";
+import { Contract, ContractFactory } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 import * as utils from "../utils";
 
 describe("IdentityProxyFactory", () => {
+  const deployer = new utils.Deployer();
+
   let owner: SignerWithAddress;
   let other: SignerWithAddress;
 
@@ -21,17 +23,23 @@ describe("IdentityProxyFactory", () => {
   });
 
   beforeEach(async () => {
-    const deployer = new utils.Deployer();
-
     moduleRegistry = await deployer.deployModuleRegistry();
     moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
-    identity = await deployer.deployIdentity(moduleManager.address);
+    identity = await deployer.deployIdentity();
     identityProxyFactory = await deployer.deployIdentityProxyFactory(
       identity.address
     );
   });
 
   describe("constructor", () => {
+    it("failure: identity implementation must be an existing contract address", async () => {
+      await expect(
+        deployer.deployIdentityProxyFactory(utils.randomAddress())
+      ).to.be.revertedWith(
+        "IPF: identity implementation must be an existing contract address"
+      );
+    });
+
     it("success", async () => {
       expect(await identityProxyFactory.identityImplementation()).to.equal(
         identity.address
@@ -58,28 +66,45 @@ describe("IdentityProxyFactory", () => {
       await expect(
         identityProxyFactory
           .connect(other)
-          .createProxy(other.address, ethers.utils.randomBytes(32))
+          .createProxy(
+            other.address,
+            moduleManager.address,
+            [],
+            [],
+            [],
+            ethers.utils.randomBytes(32)
+          )
       ).to.be.revertedWith("O: caller must be the owner");
     });
 
     it("success", async () => {
       const salt = ethers.utils.randomBytes(32);
 
-      const proxyAddr = await utils.getProxyAddress(
+      const identityProxyAddr = await utils.getProxyAddress(
         identityProxyFactory.address,
         salt,
         identity.address
       );
 
-      await expect(identityProxyFactory.createProxy(owner.address, salt))
+      await expect(
+        identityProxyFactory.createProxy(
+          owner.address,
+          moduleManager.address,
+          [],
+          [],
+          [],
+          salt
+        )
+      )
         .to.emit(identityProxyFactory, "ProxyCreated")
-        .withArgs(proxyAddr);
+        .withArgs(identityProxyAddr);
 
-      const proxy = (await ethers.getContractFactory("Proxy")).attach(
-        proxyAddr
+      const identityProxy = await ethers.getContractAt(
+        "Proxy",
+        identityProxyAddr
       );
 
-      expect(await proxy.implementation()).to.equal(identity.address);
+      expect(await identityProxy.implementation()).to.equal(identity.address);
     });
   });
 });
