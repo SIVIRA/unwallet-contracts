@@ -7,7 +7,7 @@ unWallet is a contract wallet with upgradability based on its modular structure.
 ### Install
 
 ```sh
-$ npm install
+$ npm ci
 ```
 
 ### Test
