@@ -9,8 +9,9 @@ import "./utils/Address.sol";
 contract Identity is IIdentity {
     using Address for address;
 
+    address public owner;
+
     bool internal _isInitialized;
-    address public override owner;
     IModuleManager internal _moduleManager;
 
     modifier onlyModule() {
@@ -19,6 +20,12 @@ contract Identity is IIdentity {
             "I: caller must be an enabled module"
         );
         _;
+    }
+
+    constructor() {
+        _isInitialized = true;
+
+        _setOwner(msg.sender);
     }
 
     function initialize(
@@ -100,7 +107,7 @@ contract Identity is IIdentity {
         return _moduleManager.isModuleEnabled(module);
     }
 
-    function getDelegate(bytes4 methodID) public view returns (address) {
+    function getDelegate(bytes4 methodID) external view returns (address) {
         return _moduleManager.getDelegate(methodID);
     }
 
