@@ -1,10 +1,13 @@
-import { HardhatUserConfig } from "hardhat/types";
+import { HardhatUserConfig } from "hardhat/config";
 
 import "@nomicfoundation/hardhat-toolbox";
 
 const config: HardhatUserConfig = {
   solidity: "0.8.16",
   networks: {},
+  gasReporter: {
+    enabled: true,
+  },
 };
 
 export default config;
