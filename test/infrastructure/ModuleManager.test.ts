@@ -71,13 +71,13 @@ describe("ModuleManager", () => {
       ).to.be.revertedWith("O: caller must be the owner");
     });
 
-    it("failure: unregistered module", async () => {
+    it("failure: module must be registered", async () => {
       await expect(
         moduleManager.enableModule(utils.randomAddress())
-      ).to.be.revertedWith("MM: unregistered module");
+      ).to.be.revertedWith("MM: module must be registered");
     });
 
-    it("success -> failure: enabled module", async () => {
+    it("success -> failure: module is already enabled", async () => {
       expect(await moduleManager.isModuleEnabled(testModule.address)).to.be
         .false;
 
@@ -90,7 +90,7 @@ describe("ModuleManager", () => {
 
       await expect(
         moduleManager.enableModule(testModule.address)
-      ).to.be.revertedWith("MM: enabled module");
+      ).to.be.revertedWith("MM: module is already enabled");
     });
   });
 
@@ -107,7 +107,7 @@ describe("ModuleManager", () => {
       ).to.be.revertedWith("O: caller must be the owner");
     });
 
-    it("success -> failure: disabled module", async () => {
+    it("success -> failure: module is already disabled", async () => {
       expect(await moduleManager.isModuleEnabled(testModule.address)).to.be
         .true;
 
@@ -120,7 +120,7 @@ describe("ModuleManager", () => {
 
       await expect(
         moduleManager.disableModule(testModule.address)
-      ).to.be.revertedWith("MM: disabled module");
+      ).to.be.revertedWith("MM: module is already disabled");
     });
   });
 
@@ -139,13 +139,13 @@ describe("ModuleManager", () => {
       ).to.be.revertedWith("O: caller must be the owner");
     });
 
-    it("failure: disabled module", async () => {
+    it("failure: module must be enabled", async () => {
       await expect(
         moduleManager.enableDelegation(methodID, testModule.address)
-      ).to.be.revertedWith("MM: disabled module");
+      ).to.be.revertedWith("MM: module must be enabled");
     });
 
-    it("success -> failure: enabled delegation", async () => {
+    it("success -> failure: delegation is already enabled", async () => {
       await utils.executeContract(
         moduleManager.enableModule(testModule.address)
       );
@@ -164,7 +164,7 @@ describe("ModuleManager", () => {
 
       await expect(
         moduleManager.enableDelegation(methodID, testModule.address)
-      ).to.be.revertedWith("MM: enabled delegation");
+      ).to.be.revertedWith("MM: delegation is already enabled");
     });
   });
 
@@ -188,7 +188,7 @@ describe("ModuleManager", () => {
       ).to.be.revertedWith("O: caller must be the owner");
     });
 
-    it("success", async () => {
+    it("success -> failure: delegation is already disabled", async () => {
       expect(await moduleManager.getDelegate(methodID)).to.equal(
         testModule.address
       );
@@ -203,7 +203,7 @@ describe("ModuleManager", () => {
 
       await expect(
         moduleManager.disableDelegation(methodID)
-      ).to.be.revertedWith("MM: disabled delegation");
+      ).to.be.revertedWith("MM: delegation is already disabled");
     });
   });
 });

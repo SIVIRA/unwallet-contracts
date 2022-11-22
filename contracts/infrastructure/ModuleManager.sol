@@ -43,10 +43,10 @@ contract ModuleManager is Ownable, IModuleManager {
     }
 
     function enableModule(address module) external override onlyOwner {
-        require(!_modules[module], "MM: enabled module");
+        require(!_modules[module], "MM: module is already enabled");
         require(
             _registry.isModuleRegistered(module),
-            "MM: unregistered module"
+            "MM: module must be registered"
         );
 
         _modules[module] = true;
@@ -55,7 +55,7 @@ contract ModuleManager is Ownable, IModuleManager {
     }
 
     function disableModule(address module) external override onlyOwner {
-        require(_modules[module], "MM: disabled module");
+        require(_modules[module], "MM: module is already disabled");
 
         delete _modules[module];
 
@@ -76,8 +76,11 @@ contract ModuleManager is Ownable, IModuleManager {
         override
         onlyOwner
     {
-        require(_delegates[methodID] != module, "MM: enabled delegation");
-        require(_modules[module], "MM: disabled module");
+        require(
+            _delegates[methodID] != module,
+            "MM: delegation is already enabled"
+        );
+        require(_modules[module], "MM: module must be enabled");
 
         _delegates[methodID] = module;
 
@@ -85,7 +88,10 @@ contract ModuleManager is Ownable, IModuleManager {
     }
 
     function disableDelegation(bytes4 methodID) external override onlyOwner {
-        require(_delegates[methodID] != address(0), "MM: disabled delegation");
+        require(
+            _delegates[methodID] != address(0),
+            "MM: delegation is already disabled"
+        );
 
         delete _delegates[methodID];
 

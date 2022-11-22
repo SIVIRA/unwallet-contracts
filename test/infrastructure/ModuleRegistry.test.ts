@@ -43,7 +43,7 @@ describe("ModuleRegistry", () => {
       ).to.be.revertedWith("MR: module must be an existing contract address");
     });
 
-    it("success -> failure: registered module", async () => {
+    it("success -> failure: module is already registered", async () => {
       expect(await moduleRegistry.isModuleRegistered(testModule.address)).to.be
         .false;
 
@@ -56,7 +56,7 @@ describe("ModuleRegistry", () => {
 
       await expect(
         moduleRegistry.registerModule(testModule.address)
-      ).to.be.revertedWith("MR: registered module");
+      ).to.be.revertedWith("MR: module is already registered");
     });
   });
 
@@ -73,7 +73,7 @@ describe("ModuleRegistry", () => {
       ).to.be.revertedWith("O: caller must be the owner");
     });
 
-    it("success -> failure: unregistered module", async () => {
+    it("success -> failure: module is already deregistered", async () => {
       expect(await moduleRegistry.isModuleRegistered(testModule.address)).to.be
         .true;
 
@@ -86,7 +86,7 @@ describe("ModuleRegistry", () => {
 
       await expect(
         moduleRegistry.deregisterModule(testModule.address)
-      ).to.be.revertedWith("MR: unregistered module");
+      ).to.be.revertedWith("MR: module is already deregistered");
     });
   });
 });
