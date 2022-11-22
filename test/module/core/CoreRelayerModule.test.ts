@@ -34,9 +34,7 @@ describe("CoreRelayerModule", () => {
     moduleRegistry = await deployer.deployModuleRegistry();
     moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
     identity = await deployer.deployIdentity();
-    identityProxyFactory = await deployer.deployIdentityProxyFactory(
-      identity.address
-    );
+    identityProxyFactory = await deployer.deployIdentityProxyFactory();
     lockManager = await deployer.deployLockManager();
 
     const moduleDeployer = new utils.ModuleDeployer(moduleRegistry);
@@ -53,12 +51,15 @@ describe("CoreRelayerModule", () => {
     );
 
     identityProxy = await identityProxyDeployer.deployProxy(
-      owner.address,
-      moduleManager.address,
-      [module.address, testModule.address],
-      [],
-      [],
+      identity.address,
       ethers.utils.randomBytes(32),
+      identity.interface.encodeFunctionData("initialize", [
+        owner.address,
+        moduleManager.address,
+        [module.address, testModule.address],
+        [],
+        [],
+      ]),
       "Identity"
     );
 

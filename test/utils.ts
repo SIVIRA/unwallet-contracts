@@ -42,16 +42,16 @@ class Deployer extends DeployerBase {
     return this.deployContract("Factory");
   }
 
-  public deployIdentityProxyFactory(identityAddr: string): Promise<Contract> {
-    return this.deployContract("IdentityProxyFactory", [identityAddr]);
+  public deployIdentityProxyFactory(): Promise<Contract> {
+    return this.deployContract("IdentityProxyFactory");
   }
 
   public deployModuleRegistry(): Promise<Contract> {
     return this.deployContract("ModuleRegistry");
   }
 
-  public deployModuleManager(registryAddr: string): Promise<Contract> {
-    return this.deployContract("ModuleManager", [registryAddr]);
+  public deployModuleManager(registryAddress: string): Promise<Contract> {
+    return this.deployContract("ModuleManager", [registryAddress]);
   }
 
   public deployLockManager(): Promise<Contract> {
@@ -97,32 +97,18 @@ class IdentityProxyDeployer extends DeployerBase {
   }
 
   public async deployProxy(
-    ownerAddr: string,
-    moduleManagerImplAddr: string,
-    moduleAddrs: string[],
-    delegateModuleAddrs: string[],
-    delegateMethodIDs: string[],
+    identityAddress: string,
     salt: BytesLike,
+    data: BytesLike,
     as: string = "Proxy"
   ): Promise<Contract> {
     await executeContract(
-      this.factory.createProxy(
-        ownerAddr,
-        moduleManagerImplAddr,
-        moduleAddrs,
-        delegateModuleAddrs,
-        delegateMethodIDs,
-        salt
-      )
+      this.factory.createProxy(identityAddress, salt, data)
     );
 
     return ethers.getContractAt(
       as,
-      await getProxyAddress(
-        this.factory.address,
-        salt,
-        await this.factory.identityImplementation()
-      )
+      await getProxyAddress(this.factory.address, salt, identityAddress)
     );
   }
 }
@@ -425,17 +411,17 @@ const now = async (): Promise<number> => {
 };
 
 const getProxyAddress = async (
-  fromAddr: string,
+  fromAddress: string,
   salt: BytesLike,
-  implAddr: string
+  implAddress: string
 ): Promise<string> => {
   return ethers.utils.getCreate2Address(
-    fromAddr,
+    fromAddress,
     salt,
     ethers.utils.keccak256(
       ethers.utils.concat([
         (await ethers.getContractFactory("Proxy")).bytecode,
-        ethers.utils.defaultAbiCoder.encode(["address"], [implAddr]),
+        ethers.utils.defaultAbiCoder.encode(["address"], [implAddress]),
       ])
     )
   );

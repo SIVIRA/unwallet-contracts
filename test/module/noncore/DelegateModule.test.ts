@@ -32,9 +32,7 @@ describe("DelegateModule", () => {
     moduleRegistry = await deployer.deployModuleRegistry();
     moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
     identity = await deployer.deployIdentity();
-    identityProxyFactory = await deployer.deployIdentityProxyFactory(
-      identity.address
-    );
+    identityProxyFactory = await deployer.deployIdentityProxyFactory();
 
     const moduleDeployer = new utils.ModuleDeployer(moduleRegistry);
 
@@ -46,24 +44,27 @@ describe("DelegateModule", () => {
     );
 
     identityProxy = await identityProxyDeployer.deployProxy(
-      owner.address,
-      moduleManager.address,
-      [module.address, testModule.address],
-      [
-        module.address,
-        module.address,
-        module.address,
-        module.address,
-        module.address,
-      ],
-      [
-        constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE,
-        constants.METHOD_ID_ERC721_ON_ERC721_RECEIVED,
-        constants.METHOD_ID_ERC1155_ON_ERC1155_RECEIVED,
-        constants.METHOD_ID_ERC1155_ON_ERC1155_BATCH_RECEIVED,
-        constants.METHOD_ID_ERC1271_IS_VALID_SIGNATURE,
-      ],
+      identity.address,
       ethers.utils.randomBytes(32),
+      identity.interface.encodeFunctionData("initialize", [
+        owner.address,
+        moduleManager.address,
+        [module.address, testModule.address],
+        [
+          module.address,
+          module.address,
+          module.address,
+          module.address,
+          module.address,
+        ],
+        [
+          constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE,
+          constants.METHOD_ID_ERC721_ON_ERC721_RECEIVED,
+          constants.METHOD_ID_ERC1155_ON_ERC1155_RECEIVED,
+          constants.METHOD_ID_ERC1155_ON_ERC1155_BATCH_RECEIVED,
+          constants.METHOD_ID_ERC1271_IS_VALID_SIGNATURE,
+        ],
+      ]),
       "Identity"
     );
     moduleManagerProxy = await ethers.getContractAt(

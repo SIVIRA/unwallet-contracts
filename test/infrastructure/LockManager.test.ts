@@ -34,9 +34,7 @@ describe("LockManager", () => {
     moduleRegistry = await deployer.deployModuleRegistry();
     moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
     identity = await deployer.deployIdentity();
-    identityProxyFactory = await deployer.deployIdentityProxyFactory(
-      identity.address
-    );
+    identityProxyFactory = await deployer.deployIdentityProxyFactory();
     lockManager = await deployer.deployLockManager();
 
     const moduleDeployer = new utils.ModuleDeployer(moduleRegistry);
@@ -49,12 +47,15 @@ describe("LockManager", () => {
     );
 
     identityProxy = await identityProxyDeployer.deployProxy(
-      owner.address,
-      moduleManager.address,
-      [testModule1.address],
-      [],
-      [],
+      identity.address,
       ethers.utils.randomBytes(32),
+      identity.interface.encodeFunctionData("initialize", [
+        owner.address,
+        moduleManager.address,
+        [testModule1.address],
+        [],
+        [],
+      ]),
       "Identity"
     );
     moduleManagerProxy = await ethers.getContractAt(

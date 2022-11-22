@@ -9,20 +9,13 @@ import "../Proxy.sol";
 contract IdentityProxyFactory is Ownable {
     using Address for address;
 
-    address public immutable identityImplementation;
-
     event ProxyCreated(address indexed proxy);
 
-    constructor(address identityImpl) {
-        require(
-            identityImpl.isContract(),
-            "IPF: identity implementation must be an existing contract address"
-        );
-
-        identityImplementation = identityImpl;
-    }
-
-    function getProxyAddress(bytes32 salt) external view returns (address) {
+    function getProxyAddress(address identityImpl, bytes32 salt)
+        external
+        view
+        returns (address)
+    {
         return
             address(
                 uint160(
@@ -35,7 +28,7 @@ contract IdentityProxyFactory is Ownable {
                                 keccak256(
                                     abi.encodePacked(
                                         type(Proxy).creationCode,
-                                        uint256(uint160(identityImplementation))
+                                        uint256(uint160(identityImpl))
                                     )
                                 )
                             )
@@ -46,22 +39,21 @@ contract IdentityProxyFactory is Ownable {
     }
 
     function createProxy(
-        address owner,
-        address moduleManagerImpl,
-        address[] calldata modules,
-        address[] calldata delegateModules,
-        bytes4[] calldata delegateMethodIDs,
-        bytes32 salt
+        address identityImpl,
+        bytes32 salt,
+        bytes calldata data
     ) external onlyOwner returns (address) {
-        address proxy = address(new Proxy{salt: salt}(identityImplementation));
+        address proxy = address(new Proxy{salt: salt}(identityImpl));
 
-        IIdentity(proxy).initialize(
-            owner,
-            moduleManagerImpl,
-            modules,
-            delegateModules,
-            delegateMethodIDs
-        );
+        if (data.length > 0) {
+            (bool success, ) = proxy.call(data);
+            if (!success) {
+                assembly {
+                    returndatacopy(0, 0, returndatasize())
+                    revert(0, returndatasize())
+                }
+            }
+        }
 
         emit ProxyCreated(proxy);
 

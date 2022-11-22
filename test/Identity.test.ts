@@ -32,9 +32,7 @@ describe("Identity", () => {
     moduleRegistry = await deployer.deployModuleRegistry();
     moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
     identity = await deployer.deployIdentity();
-    identityProxyFactory = await deployer.deployIdentityProxyFactory(
-      identity.address
-    );
+    identityProxyFactory = await deployer.deployIdentityProxyFactory();
 
     const moduleDeployer = new utils.ModuleDeployer(moduleRegistry);
 
@@ -46,12 +44,15 @@ describe("Identity", () => {
     );
 
     identityProxy = await identityProxyDeployer.deployProxy(
-      owner.address,
-      moduleManager.address,
-      [testModule1.address],
-      [testModule1.address],
-      [constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE],
+      identity.address,
       ethers.utils.randomBytes(32),
+      identity.interface.encodeFunctionData("initialize", [
+        owner.address,
+        moduleManager.address,
+        [testModule1.address],
+        [testModule1.address],
+        [constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE],
+      ]),
       "Identity"
     );
     moduleManagerProxy = await ethers.getContractAt(
@@ -80,12 +81,15 @@ describe("Identity", () => {
 
       await expect(
         identityProxyDeployer.deployProxy(
-          other.address,
-          moduleManager.address,
-          [testModule1.address],
-          [testModule1.address],
-          [],
-          ethers.utils.randomBytes(32)
+          identity.address,
+          ethers.utils.randomBytes(32),
+          identity.interface.encodeFunctionData("initialize", [
+            other.address,
+            moduleManager.address,
+            [testModule1.address],
+            [testModule1.address],
+            [],
+          ])
         )
       ).to.be.revertedWith(
         "I: delegate modules length and delegate method ids length do not match"
