@@ -6,8 +6,6 @@ interface IModuleManager {
 
     event ModuleDisabled(address indexed module);
 
-    event ModuleFixed(address indexed module);
-
     event DelegationEnabled(bytes4 indexed methodID, address indexed module);
 
     event DelegationDisabled(bytes4 indexed methodID);
@@ -16,13 +14,9 @@ interface IModuleManager {
 
     function isModuleEnabled(address module) external view returns (bool);
 
-    function isModuleFixed(address module) external view returns (bool);
-
     function enableModule(address module) external;
 
     function disableModule(address module) external;
-
-    function fixModule(address module) external;
 
     function getDelegate(bytes4 methodID) external view returns (address);
 

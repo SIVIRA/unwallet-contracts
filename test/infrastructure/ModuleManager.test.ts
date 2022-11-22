@@ -80,7 +80,6 @@ describe("ModuleManager", () => {
     it("success -> failure: enabled module", async () => {
       expect(await moduleManager.isModuleEnabled(testModule.address)).to.be
         .false;
-      expect(await moduleManager.isModuleFixed(testModule.address)).to.be.false;
 
       await expect(moduleManager.enableModule(testModule.address))
         .to.emit(moduleManager, "ModuleEnabled")
@@ -88,7 +87,6 @@ describe("ModuleManager", () => {
 
       expect(await moduleManager.isModuleEnabled(testModule.address)).to.be
         .true;
-      expect(await moduleManager.isModuleFixed(testModule.address)).to.be.false;
 
       await expect(
         moduleManager.enableModule(testModule.address)
@@ -109,18 +107,9 @@ describe("ModuleManager", () => {
       ).to.be.revertedWith("O: caller must be the owner");
     });
 
-    it("failure: fixed module", async () => {
-      await utils.executeContract(moduleManager.fixModule(testModule.address));
-
-      await expect(
-        moduleManager.disableModule(testModule.address)
-      ).to.be.revertedWith("MM: fixed module");
-    });
-
     it("success -> failure: disabled module", async () => {
       expect(await moduleManager.isModuleEnabled(testModule.address)).to.be
         .true;
-      expect(await moduleManager.isModuleFixed(testModule.address)).to.be.false;
 
       await expect(moduleManager.disableModule(testModule.address))
         .to.emit(moduleManager, "ModuleDisabled")
@@ -128,49 +117,10 @@ describe("ModuleManager", () => {
 
       expect(await moduleManager.isModuleEnabled(testModule.address)).to.be
         .false;
-      expect(await moduleManager.isModuleFixed(testModule.address)).to.be.false;
 
       await expect(
         moduleManager.disableModule(testModule.address)
       ).to.be.revertedWith("MM: disabled module");
-    });
-  });
-
-  describe("fixModule", () => {
-    beforeEach(async () => {
-      await utils.executeContract(
-        moduleManager.enableModule(testModule.address)
-      );
-    });
-
-    it("failure: caller must be the owner", async () => {
-      await expect(
-        moduleManager.connect(other).fixModule(testModule.address)
-      ).to.be.revertedWith("O: caller must be the owner");
-    });
-
-    it("failure: disabled module", async () => {
-      await expect(
-        moduleManager.fixModule(utils.randomAddress())
-      ).to.be.revertedWith("MM: disabled module");
-    });
-
-    it("success -> failure: fixed module", async () => {
-      expect(await moduleManager.isModuleEnabled(testModule.address)).to.be
-        .true;
-      expect(await moduleManager.isModuleFixed(testModule.address)).to.be.false;
-
-      await expect(moduleManager.fixModule(testModule.address))
-        .to.emit(moduleManager, "ModuleFixed")
-        .withArgs(testModule.address);
-
-      expect(await moduleManager.isModuleEnabled(testModule.address)).to.be
-        .true;
-      expect(await moduleManager.isModuleFixed(testModule.address)).to.be.true;
-
-      await expect(
-        moduleManager.fixModule(testModule.address)
-      ).to.be.revertedWith("MM: fixed module");
     });
   });
 

@@ -12,12 +12,7 @@ contract ModuleManager is Ownable, IModuleManager {
     bool internal _isInitialized;
     IModuleRegistry internal immutable _registry;
 
-    struct ModuleState {
-        bool isEnabled;
-        bool isFixed;
-    }
-
-    mapping(address => ModuleState) internal _moduleStates;
+    mapping(address => bool) internal _modules;
     mapping(bytes4 => address) internal _delegates;
 
     constructor(address registry) {
@@ -44,46 +39,27 @@ contract ModuleManager is Ownable, IModuleManager {
         override
         returns (bool)
     {
-        return _moduleStates[module].isEnabled;
-    }
-
-    function isModuleFixed(address module)
-        external
-        view
-        override
-        returns (bool)
-    {
-        return _moduleStates[module].isFixed;
+        return _modules[module];
     }
 
     function enableModule(address module) external override onlyOwner {
-        require(!_moduleStates[module].isEnabled, "MM: enabled module");
+        require(!_modules[module], "MM: enabled module");
         require(
             _registry.isModuleRegistered(module),
             "MM: unregistered module"
         );
 
-        _moduleStates[module].isEnabled = true;
+        _modules[module] = true;
 
         emit ModuleEnabled(module);
     }
 
     function disableModule(address module) external override onlyOwner {
-        require(_moduleStates[module].isEnabled, "MM: disabled module");
-        require(!_moduleStates[module].isFixed, "MM: fixed module");
+        require(_modules[module], "MM: disabled module");
 
-        delete _moduleStates[module];
+        delete _modules[module];
 
         emit ModuleDisabled(module);
-    }
-
-    function fixModule(address module) external override onlyOwner {
-        require(!_moduleStates[module].isFixed, "MM: fixed module");
-        require(_moduleStates[module].isEnabled, "MM: disabled module");
-
-        _moduleStates[module].isFixed = true;
-
-        emit ModuleFixed(module);
     }
 
     function getDelegate(bytes4 methodID)
@@ -101,7 +77,7 @@ contract ModuleManager is Ownable, IModuleManager {
         onlyOwner
     {
         require(_delegates[methodID] != module, "MM: enabled delegation");
-        require(_moduleStates[module].isEnabled, "MM: disabled module");
+        require(_modules[module], "MM: disabled module");
 
         _delegates[methodID] = module;
 
