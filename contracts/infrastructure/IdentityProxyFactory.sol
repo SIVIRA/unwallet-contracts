@@ -2,7 +2,6 @@
 pragma solidity 0.8.16;
 
 import "./base/Ownable.sol";
-import "../interface/IIdentity.sol";
 import "../Proxy.sol";
 
 contract IdentityProxyFactory is Ownable {
