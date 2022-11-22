@@ -27,7 +27,7 @@ contract Identity is IIdentity {
         address[] calldata modules,
         address[] calldata delegateModules,
         bytes4[] calldata delegateMethodIDs
-    ) external override {
+    ) external {
         require(!_isInitialized, "I: contract is already initialized");
         require(
             delegateModules.length == delegateMethodIDs.length,
