@@ -6,7 +6,7 @@ import "../../interface/IIdentity.sol";
 import "../../utils/ECDSA.sol";
 import "../../utils/Math.sol";
 
-abstract contract CoreRelayerModule is CoreBaseModule {
+contract CoreRelayerModule is CoreBaseModule {
     using ECDSA for bytes32;
 
     uint256 internal immutable _minGas;
@@ -28,7 +28,11 @@ abstract contract CoreRelayerModule is CoreBaseModule {
         uint256 amount
     );
 
-    constructor(uint256 minGas, uint256 refundGas) {
+    constructor(
+        address lockManager,
+        uint256 minGas,
+        uint256 refundGas
+    ) CoreBaseModule(lockManager) {
         _minGas = minGas;
         _refundGas = refundGas;
     }

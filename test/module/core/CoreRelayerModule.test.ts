@@ -40,7 +40,7 @@ describe("CoreRelayerModule", () => {
     const moduleDeployer = new utils.ModuleDeployer(moduleRegistry);
 
     module = await moduleDeployer.deployModule(
-      "CoreModuleAggregate",
+      "CoreRelayerModule",
       [lockManager.address, 21000, 31000],
       true
     );

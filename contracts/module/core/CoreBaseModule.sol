@@ -2,14 +2,17 @@
 pragma solidity 0.8.16;
 
 import "../../interface/ILockManager.sol";
+import "../../utils/Address.sol";
 
-abstract contract CoreBaseModule {
+contract CoreBaseModule {
+    using Address for address;
+
     ILockManager internal immutable _lockManager;
 
     constructor(address lockManager) {
         require(
-            lockManager != address(0),
-            "CBM: lock manager must not be the zero address"
+            lockManager.isContract(),
+            "CBM: lock manager must be an existing contract address"
         );
 
         _lockManager = ILockManager(lockManager);
