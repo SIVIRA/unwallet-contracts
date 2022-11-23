@@ -37,12 +37,12 @@ contract IdentityProxyFactory is Ownable {
     function createProxy(
         address identityImpl,
         bytes32 salt,
-        bytes calldata data
+        bytes calldata initData
     ) external onlyOwner returns (address) {
         address proxy = address(new Proxy{salt: salt}(identityImpl));
 
-        if (data.length > 0) {
-            (bool success, ) = proxy.call(data);
+        if (initData.length > 0) {
+            (bool success, ) = proxy.call(initData);
             if (!success) {
                 assembly {
                     returndatacopy(0, 0, returndatasize())
