@@ -7,7 +7,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import * as constants from "../../constants";
 import * as utils from "../../utils";
 
-describe("CoreRelayerModule", () => {
+describe("RelayerModule", () => {
   const deployer = new utils.Deployer();
 
   let owner: SignerWithAddress;
@@ -40,7 +40,7 @@ describe("CoreRelayerModule", () => {
     const moduleDeployer = new utils.ModuleDeployer(moduleRegistry);
 
     module = await moduleDeployer.deployModule(
-      "CoreRelayerModule",
+      "RelayerModule",
       [lockManager.address, 21000, 31000],
       true
     );

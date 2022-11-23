@@ -4,7 +4,7 @@ pragma solidity 0.8.16;
 import "../../interface/ILockManager.sol";
 import "../../utils/Address.sol";
 
-contract CoreBaseModule {
+contract BaseModule {
     using Address for address;
 
     ILockManager internal immutable _lockManager;

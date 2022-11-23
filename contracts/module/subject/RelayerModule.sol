@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 pragma solidity 0.8.16;
 
-import "./CoreBaseModule.sol";
+import "./BaseModule.sol";
 import "../../interface/IIdentity.sol";
 import "../../utils/ECDSA.sol";
 import "../../utils/Math.sol";
 
-contract CoreRelayerModule is CoreBaseModule {
+contract RelayerModule is BaseModule {
     using ECDSA for bytes32;
 
     uint256 internal immutable _minGas;
@@ -32,7 +32,7 @@ contract CoreRelayerModule is CoreBaseModule {
         address lockManager,
         uint256 minGas,
         uint256 refundGas
-    ) CoreBaseModule(lockManager) {
+    ) BaseModule(lockManager) {
         _minGas = minGas;
         _refundGas = refundGas;
     }
