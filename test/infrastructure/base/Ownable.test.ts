@@ -22,7 +22,7 @@ describe("Ownable", () => {
     ownable = await deployer.deployContract("Ownable");
   });
 
-  describe("constructor", () => {
+  describe("initial state", () => {
     it("success", async () => {
       expect(await ownable.owner()).to.equal(owner.address);
     });

@@ -186,14 +186,17 @@ describe("CoreRelayerModule", () => {
       it("failure: transfer amount exceeds balance", async () => {
         expect(await testERC20.balanceOf(identityProxy.address)).to.equal(0);
 
-        const data = testERC20.interface.encodeFunctionData("transfer", [
-          owner.address,
-          1,
-        ]);
-
         await metaTxManager.expectMetaTxFailureWithoutRefund(
           "executeThroughIdentity",
-          [identityProxy.address, testERC20.address, 0, data],
+          [
+            identityProxy.address,
+            testERC20.address,
+            0,
+            testERC20.interface.encodeFunctionData("transfer", [
+              owner.address,
+              1,
+            ]),
+          ],
           "ERC20: transfer amount exceeds balance"
         );
       });
@@ -208,14 +211,17 @@ describe("CoreRelayerModule", () => {
           totalSupply
         );
 
-        const data = testERC20.interface.encodeFunctionData("transfer", [
-          owner.address,
-          totalSupply,
-        ]);
-
         await metaTxManager.expectMetaTxSuccessWithoutRefund(
           "executeThroughIdentity",
-          [identityProxy.address, testERC20.address, 0, data],
+          [
+            identityProxy.address,
+            testERC20.address,
+            0,
+            testERC20.interface.encodeFunctionData("transfer", [
+              owner.address,
+              totalSupply,
+            ]),
+          ],
           {
             types: ["bool"],
             values: [true],
