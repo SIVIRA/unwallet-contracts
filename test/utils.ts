@@ -108,7 +108,7 @@ class IdentityProxyDeployer extends DeployerBase {
 
     return ethers.getContractAt(
       as,
-      await getProxyAddress(this.factory.address, salt, identityAddress)
+      await expectProxyAddress(this.factory.address, salt, identityAddress)
     );
   }
 }
@@ -410,7 +410,7 @@ async function now(): Promise<number> {
   return (await getLatestBlock()).timestamp;
 }
 
-async function getProxyAddress(
+async function expectProxyAddress(
   fromAddress: string,
   salt: BytesLike,
   implAddress: string
@@ -442,6 +442,6 @@ export {
   randomMethodID,
   getLatestBlock,
   now,
-  getProxyAddress,
+  expectProxyAddress,
   executeContract,
 };

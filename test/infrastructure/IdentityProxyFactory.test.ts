@@ -36,7 +36,7 @@ describe("IdentityProxyFactory", () => {
       expect(
         await identityProxyFactory.getProxyAddress(identity.address, salt)
       ).to.equal(
-        await utils.getProxyAddress(
+        await utils.expectProxyAddress(
           identityProxyFactory.address,
           salt,
           identity.address
@@ -67,7 +67,7 @@ describe("IdentityProxyFactory", () => {
     it("success", async () => {
       const salt = ethers.utils.randomBytes(32);
 
-      const identityProxyAddress = await utils.getProxyAddress(
+      const expectedProxyAddress = await utils.expectProxyAddress(
         identityProxyFactory.address,
         salt,
         identity.address
@@ -87,11 +87,11 @@ describe("IdentityProxyFactory", () => {
         )
       )
         .to.emit(identityProxyFactory, "ProxyCreated")
-        .withArgs(identityProxyAddress);
+        .withArgs(expectedProxyAddress);
 
       const identityProxy = await ethers.getContractAt(
         "Proxy",
-        identityProxyAddress
+        expectedProxyAddress
       );
 
       expect(await identityProxy.implementation()).to.equal(identity.address);
