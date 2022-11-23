@@ -380,7 +380,7 @@ class MetaTxManager {
   }
 }
 
-const randomString = (length: number = 8): string => {
+function randomString(length: number = 8): string {
   const chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -390,31 +390,31 @@ const randomString = (length: number = 8): string => {
   }
 
   return s;
-};
+}
 
-const randomAddress = (): string => {
+function randomAddress(): string {
   return ethers.utils.getAddress(
     ethers.utils.hexlify(ethers.utils.randomBytes(20))
   );
-};
+}
 
-const randomMethodID = (): string => {
+function randomMethodID(): string {
   return ethers.utils.hexlify(ethers.utils.randomBytes(4));
-};
+}
 
-const getLatestBlock = async (): Promise<Block> => {
+async function getLatestBlock(): Promise<Block> {
   return ethers.provider.getBlock(await ethers.provider.getBlockNumber());
-};
+}
 
-const now = async (): Promise<number> => {
+async function now(): Promise<number> {
   return (await getLatestBlock()).timestamp;
-};
+}
 
-const getProxyAddress = async (
+async function getProxyAddress(
   fromAddress: string,
   salt: BytesLike,
   implAddress: string
-): Promise<string> => {
+): Promise<string> {
   return ethers.utils.getCreate2Address(
     fromAddress,
     salt,
@@ -425,13 +425,11 @@ const getProxyAddress = async (
       ])
     )
   );
-};
+}
 
-const executeContract = async (
-  f: Promise<ContractTransaction>
-): Promise<void> => {
+async function executeContract(f: Promise<ContractTransaction>): Promise<void> {
   (await f).wait();
-};
+}
 
 export {
   ExecutionGasConfig,
