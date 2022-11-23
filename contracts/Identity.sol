@@ -22,12 +22,6 @@ contract Identity is IIdentity {
         _;
     }
 
-    constructor() {
-        _isInitialized = true;
-
-        _setOwner(msg.sender);
-    }
-
     function initialize(
         address initialOwner,
         address moduleManagerImpl,
