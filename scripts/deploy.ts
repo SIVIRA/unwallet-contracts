@@ -17,8 +17,10 @@ const REFUND_GAS = 31_000;
 (async () => {
   const [owner] = await ethers.getSigners();
 
+  const network = await ethers.provider.getNetwork();
+
   const deployer = await (async (): Promise<utils.Deployer> => {
-    switch ((await ethers.provider.getNetwork()).chainId) {
+    switch (network.chainId) {
       case 31337:
         const factoryFactory = await ethers.getContractFactory("Factory");
         const factory = await factoryFactory.deploy();
@@ -181,31 +183,60 @@ const REFUND_GAS = 31_000;
   console.log();
 
   let relayerModule: Contract;
-  {
-    const name = "RelayerModule";
+  switch (network.chainId) {
+    case 42161:
+    case 421613: {
+      const name = "ArbRelayerModule";
 
-    console.log(`[${name}]`);
+      console.log(`[${name}]`);
 
-    const factory = await ethers.getContractFactory(name);
+      const factory = await ethers.getContractFactory(name);
 
-    const code = ethers.utils.concat([
-      factory.bytecode,
-      ethers.utils.defaultAbiCoder.encode(
-        ["address", "uint256", "uint256"],
-        [lockManager.address, MIN_GAS, REFUND_GAS]
-      ),
-    ]);
-    const expectedAddress = deployer.expectAddress(code, SALT);
+      const code = ethers.utils.concat([
+        factory.bytecode,
+        ethers.utils.defaultAbiCoder.encode(["address"], [lockManager.address]),
+      ]);
+      const expectedAddress = deployer.expectAddress(code, SALT);
 
-    if (await utils.isContractDeployed(expectedAddress)) {
-      console.log(`skip (already deployed at ${expectedAddress})`);
-    } else {
-      console.log(`deploying...`);
-      await deployer.deploy(code, SALT);
-      console.log(`deployed to ${expectedAddress}`);
+      if (await utils.isContractDeployed(expectedAddress)) {
+        console.log(`skip (already deployed at ${expectedAddress})`);
+      } else {
+        console.log(`deploying...`);
+        await deployer.deploy(code, SALT);
+        console.log(`deployed to ${expectedAddress}`);
+      }
+
+      relayerModule = factory.attach(expectedAddress);
+
+      break;
     }
 
-    relayerModule = factory.attach(expectedAddress);
+    default: {
+      const name = "RelayerModule";
+
+      console.log(`[${name}]`);
+
+      const factory = await ethers.getContractFactory(name);
+
+      const code = ethers.utils.concat([
+        factory.bytecode,
+        ethers.utils.defaultAbiCoder.encode(
+          ["address", "uint256", "uint256"],
+          [lockManager.address, MIN_GAS, REFUND_GAS]
+        ),
+      ]);
+      const expectedAddress = deployer.expectAddress(code, SALT);
+
+      if (await utils.isContractDeployed(expectedAddress)) {
+        console.log(`skip (already deployed at ${expectedAddress})`);
+      } else {
+        console.log(`deploying...`);
+        await deployer.deploy(code, SALT);
+        console.log(`deployed to ${expectedAddress}`);
+      }
+
+      relayerModule = factory.attach(expectedAddress);
+    }
   }
 
   console.log();
