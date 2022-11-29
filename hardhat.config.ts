@@ -16,7 +16,7 @@ if (
 }
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.16",
+  solidity: "0.8.17",
   networks: networks,
   gasReporter: {
     enabled: true,

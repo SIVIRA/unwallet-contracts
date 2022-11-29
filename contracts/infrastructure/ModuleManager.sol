@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-pragma solidity 0.8.16;
+pragma solidity 0.8.17;
 
 import "./base/Ownable.sol";
 import "../interface/IModuleManager.sol";
