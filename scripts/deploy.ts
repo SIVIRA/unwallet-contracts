@@ -12,7 +12,7 @@ const LOCK_PERIOD = 60 * 60 * 24 * 7;
 
 // should be adjusted according to the network
 const MIN_GAS = 21_000;
-const REFUND_GAS = 31_000;
+const REFUND_GAS = 22_000;
 
 (async () => {
   const [owner] = await ethers.getSigners();
