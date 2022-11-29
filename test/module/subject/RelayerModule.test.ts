@@ -41,7 +41,7 @@ describe("RelayerModule", () => {
 
     module = await moduleDeployer.deployModule(
       "RelayerModule",
-      [lockManager.address, 21000, 31000],
+      [lockManager.address, 21000, 22000],
       true
     );
     testModule = await moduleDeployer.deployModule("TestModule", [], true);
@@ -100,16 +100,17 @@ describe("RelayerModule", () => {
         await tx.wait();
       }
 
-      const ownerBalanceBefore = await owner.getBalance();
       const proxyBalanceBefore = await ethers.provider.getBalance(
         identityProxy.address
       );
+
       const gasPrice = ethers.BigNumber.from(1_000_000_000);
       const gasLimit = ethers.BigNumber.from(100_000);
+      const gasFee = gasPrice.mul(gasLimit);
 
       expect(await module.getNonce(identityProxy.address)).to.equal(0);
 
-      const receipt = await metaTxManager.expectMetaTxSuccess(
+      await metaTxManager.expectMetaTxSuccess(
         "ping",
         [],
         {
@@ -121,25 +122,14 @@ describe("RelayerModule", () => {
         constants.EMPTY_EXECUTION_RESULT
       );
 
-      const ownerBalanceAfter = await owner.getBalance();
       const proxyBalanceAfter = await ethers.provider.getBalance(
         identityProxy.address
       );
 
       expect(await module.getNonce(identityProxy.address)).to.equal(1);
-      expect(ownerBalanceAfter).to.be.above(ownerBalanceBefore);
-      expect(proxyBalanceAfter).to.be.below(proxyBalanceBefore);
-
-      const ownerBalanceDiff = ownerBalanceAfter.sub(ownerBalanceBefore);
-      const proxyBalanceDiff = proxyBalanceBefore.sub(proxyBalanceAfter);
-      const acceptableGasError = ethers.BigNumber.from(5_000);
-
-      expect(ownerBalanceDiff).to.be.below(
-        acceptableGasError.mul(receipt.effectiveGasPrice)
-      );
-      expect(proxyBalanceDiff).to.be.below(gasLimit.mul(gasPrice));
-      expect(proxyBalanceDiff).to.be.below(
-        receipt.gasUsed.add(acceptableGasError).mul(receipt.effectiveGasPrice)
+      expect(proxyBalanceAfter).to.be.within(
+        proxyBalanceBefore.sub(gasFee),
+        proxyBalanceBefore.sub(1)
       );
     });
   });
