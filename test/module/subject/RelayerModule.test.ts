@@ -75,7 +75,7 @@ describe("RelayerModule", () => {
           "ping",
           []
         );
-        await expect(executor).to.be.revertedWith("CRM: invalid signer");
+        await expect(executor).to.be.revertedWith("RM: invalid signer");
       }
     });
 
@@ -153,7 +153,7 @@ describe("RelayerModule", () => {
           0,
           []
         )
-      ).to.be.revertedWith("CBM: caller must be myself");
+      ).to.be.revertedWith("BM: caller must be myself");
     });
 
     it("failure: identity must be unlocked", async () => {
@@ -164,7 +164,7 @@ describe("RelayerModule", () => {
       await metaTxManager.expectMetaTxFailureWithoutRefund(
         "executeThroughIdentity",
         [identityProxy.address, utils.randomAddress(), 0, []],
-        "CBM: identity must be unlocked"
+        "BM: identity must be unlocked"
       );
     });
 

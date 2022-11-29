@@ -62,7 +62,7 @@ contract RelayerModule is BaseModule {
 
         address signer = txHash.toEthSignedMessageHash().recover(sig);
 
-        require(signer == IIdentity(identity).owner(), "CRM: invalid signer");
+        require(signer == IIdentity(identity).owner(), "RM: invalid signer");
 
         _nonces[identity]++;
 
@@ -134,7 +134,7 @@ contract RelayerModule is BaseModule {
     ) internal {
         require(
             gasToken == address(0),
-            "CRM: gas token must be the zero address"
+            "RM: gas token must be the zero address"
         );
 
         to = to == address(0) ? msg.sender : to;

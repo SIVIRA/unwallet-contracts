@@ -12,19 +12,19 @@ contract BaseModule {
     constructor(address lockManager) {
         require(
             lockManager.isContract(),
-            "CBM: lock manager must be an existing contract address"
+            "BM: lock manager must be an existing contract address"
         );
 
         _lockManager = ILockManager(lockManager);
     }
 
     modifier onlySelf() {
-        require(_isSelf(msg.sender), "CBM: caller must be myself");
+        require(_isSelf(msg.sender), "BM: caller must be myself");
         _;
     }
 
     modifier onlyWhenIdentityUnlocked(address identity) {
-        require(!_isIdentityLocked(identity), "CBM: identity must be unlocked");
+        require(!_isIdentityLocked(identity), "BM: identity must be unlocked");
         _;
     }
 
