@@ -1,27 +1,30 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-pragma solidity 0.8.16;
+pragma solidity 0.8.17;
 
 import "../../interface/ILockManager.sol";
+import "../../utils/Address.sol";
 
-abstract contract CoreBaseModule {
+contract BaseModule {
+    using Address for address;
+
     ILockManager internal immutable _lockManager;
 
     constructor(address lockManager) {
         require(
-            lockManager != address(0),
-            "CBM: lock manager must not be the zero address"
+            lockManager.isContract(),
+            "BM: lock manager must be an existing contract address"
         );
 
         _lockManager = ILockManager(lockManager);
     }
 
     modifier onlySelf() {
-        require(_isSelf(msg.sender), "CBM: caller must be myself");
+        require(_isSelf(msg.sender), "BM: caller must be myself");
         _;
     }
 
     modifier onlyWhenIdentityUnlocked(address identity) {
-        require(!_isIdentityLocked(identity), "CBM: identity must be unlocked");
+        require(!_isIdentityLocked(identity), "BM: identity must be unlocked");
         _;
     }
 

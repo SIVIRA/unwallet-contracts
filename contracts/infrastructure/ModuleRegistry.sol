@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-pragma solidity 0.8.16;
+pragma solidity 0.8.17;
 
 import "./base/Ownable.sol";
 import "../interface/IModuleRegistry.sol";
@@ -24,7 +24,7 @@ contract ModuleRegistry is Ownable, IModuleRegistry {
             module.isContract(),
             "MR: module must be an existing contract address"
         );
-        require(!_modules[module], "MR: registered module");
+        require(!_modules[module], "MR: module is already registered");
 
         _modules[module] = true;
 
@@ -32,7 +32,7 @@ contract ModuleRegistry is Ownable, IModuleRegistry {
     }
 
     function deregisterModule(address module) external override onlyOwner {
-        require(_modules[module], "MR: unregistered module");
+        require(_modules[module], "MR: module is already deregistered");
 
         delete _modules[module];
 

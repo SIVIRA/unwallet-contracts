@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity 0.8.16;
+pragma solidity 0.8.17;
 
 interface IIdentity {
     event OwnershipTransferred(
@@ -18,14 +18,6 @@ interface IIdentity {
         uint256 value,
         bytes data
     );
-
-    function initialize(
-        address initialOwner,
-        address moduleManagerImpl,
-        address[] calldata modules,
-        address[] calldata delegateModules,
-        bytes4[] calldata delegateMethodIDs
-    ) external;
 
     function owner() external view returns (address);
 

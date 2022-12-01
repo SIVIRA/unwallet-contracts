@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity 0.8.16;
+pragma solidity 0.8.17;
 
 interface IModuleManager {
     event ModuleEnabled(address indexed module);
 
     event ModuleDisabled(address indexed module);
-
-    event ModuleFixed(address indexed module);
 
     event DelegationEnabled(bytes4 indexed methodID, address indexed module);
 
@@ -16,13 +14,9 @@ interface IModuleManager {
 
     function isModuleEnabled(address module) external view returns (bool);
 
-    function isModuleFixed(address module) external view returns (bool);
-
     function enableModule(address module) external;
 
     function disableModule(address module) external;
-
-    function fixModule(address module) external;
 
     function getDelegate(bytes4 methodID) external view returns (address);
 

@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-pragma solidity 0.8.16;
+pragma solidity 0.8.17;
 
-import "./CoreBaseModule.sol";
+import "./BaseModule.sol";
 import "../../interface/IIdentity.sol";
 import "../../utils/ECDSA.sol";
 import "../../utils/Math.sol";
 
-abstract contract CoreRelayerModule is CoreBaseModule {
+contract ArbRelayerModule is BaseModule {
     using ECDSA for bytes32;
-
-    uint256 internal immutable _minGas;
-    uint256 internal immutable _refundGas;
 
     mapping(address => uint256) internal _nonces;
 
@@ -28,10 +25,7 @@ abstract contract CoreRelayerModule is CoreBaseModule {
         uint256 amount
     );
 
-    constructor(uint256 minGas, uint256 refundGas) {
-        _minGas = minGas;
-        _refundGas = refundGas;
-    }
+    constructor(address lockManager) BaseModule(lockManager) {}
 
     function getNonce(address identity) external view returns (uint256) {
         return _nonces[identity];
@@ -45,8 +39,6 @@ abstract contract CoreRelayerModule is CoreBaseModule {
         address refundTo,
         bytes calldata sig
     ) external returns (bool) {
-        uint256 gasInit = gasleft() + _minGas + msg.data.length * 8;
-
         bytes32 txHash = _getTxHash(
             identity,
             data,
@@ -58,7 +50,7 @@ abstract contract CoreRelayerModule is CoreBaseModule {
 
         address signer = txHash.toEthSignedMessageHash().recover(sig);
 
-        require(signer == IIdentity(identity).owner(), "CRM: invalid signer");
+        require(signer == IIdentity(identity).owner(), "ARM: invalid signer");
 
         _nonces[identity]++;
 
@@ -67,14 +59,7 @@ abstract contract CoreRelayerModule is CoreBaseModule {
         emit Executed(identity, success, result, txHash);
 
         if (gasPrice > 0) {
-            _refund(
-                identity,
-                refundTo,
-                gasInit,
-                gasPrice,
-                gasLimit,
-                address(0)
-            );
+            _refund(identity, refundTo, gasPrice, gasLimit, address(0));
         }
 
         return success;
@@ -123,21 +108,18 @@ abstract contract CoreRelayerModule is CoreBaseModule {
     function _refund(
         address identity,
         address to,
-        uint256 gasInit,
         uint256 gasPrice,
         uint256 gasLimit,
         address gasToken
     ) internal {
         require(
             gasToken == address(0),
-            "CRM: gas token must be the zero address"
+            "ARM: gas token must be the zero address"
         );
 
         to = to == address(0) ? msg.sender : to;
 
-        uint256 gasConsumed = gasInit - gasleft() + _refundGas;
-        uint256 refundAmount = Math.min(gasConsumed, gasLimit) *
-            Math.min(tx.gasprice, gasPrice);
+        uint256 refundAmount = gasLimit * gasPrice;
 
         _executeThroughIdentity(identity, to, refundAmount, "");
 

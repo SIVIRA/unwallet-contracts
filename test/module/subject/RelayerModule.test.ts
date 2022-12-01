@@ -7,7 +7,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import * as constants from "../../constants";
 import * as utils from "../../utils";
 
-describe("CoreRelayerModule", () => {
+describe("RelayerModule", () => {
   const deployer = new utils.Deployer();
 
   let owner: SignerWithAddress;
@@ -34,16 +34,14 @@ describe("CoreRelayerModule", () => {
     moduleRegistry = await deployer.deployModuleRegistry();
     moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
     identity = await deployer.deployIdentity();
-    identityProxyFactory = await deployer.deployIdentityProxyFactory(
-      identity.address
-    );
+    identityProxyFactory = await deployer.deployIdentityProxyFactory();
     lockManager = await deployer.deployLockManager();
 
     const moduleDeployer = new utils.ModuleDeployer(moduleRegistry);
 
     module = await moduleDeployer.deployModule(
-      "CoreModuleAggregate",
-      [lockManager.address, 21000, 31000],
+      "RelayerModule",
+      [lockManager.address, 21000, 22000],
       true
     );
     testModule = await moduleDeployer.deployModule("TestModule", [], true);
@@ -53,12 +51,15 @@ describe("CoreRelayerModule", () => {
     );
 
     identityProxy = await identityProxyDeployer.deployProxy(
-      owner.address,
-      moduleManager.address,
-      [module.address, testModule.address],
-      [],
-      [],
+      identity.address,
       ethers.utils.randomBytes(32),
+      identity.interface.encodeFunctionData("initialize", [
+        owner.address,
+        moduleManager.address,
+        [module.address, testModule.address],
+        [],
+        [],
+      ]),
       "Identity"
     );
 
@@ -74,7 +75,7 @@ describe("CoreRelayerModule", () => {
           "ping",
           []
         );
-        await expect(executor).to.be.revertedWith("CRM: invalid signer");
+        await expect(executor).to.be.revertedWith("RM: invalid signer");
       }
     });
 
@@ -99,16 +100,17 @@ describe("CoreRelayerModule", () => {
         await tx.wait();
       }
 
-      const ownerBalanceBefore = await owner.getBalance();
       const proxyBalanceBefore = await ethers.provider.getBalance(
         identityProxy.address
       );
+
       const gasPrice = ethers.BigNumber.from(1_000_000_000);
       const gasLimit = ethers.BigNumber.from(100_000);
+      const gasFee = gasPrice.mul(gasLimit);
 
       expect(await module.getNonce(identityProxy.address)).to.equal(0);
 
-      const receipt = await metaTxManager.expectMetaTxSuccess(
+      await metaTxManager.expectMetaTxSuccess(
         "ping",
         [],
         {
@@ -120,25 +122,14 @@ describe("CoreRelayerModule", () => {
         constants.EMPTY_EXECUTION_RESULT
       );
 
-      const ownerBalanceAfter = await owner.getBalance();
       const proxyBalanceAfter = await ethers.provider.getBalance(
         identityProxy.address
       );
 
       expect(await module.getNonce(identityProxy.address)).to.equal(1);
-      expect(ownerBalanceAfter).to.be.above(ownerBalanceBefore);
-      expect(proxyBalanceAfter).to.be.below(proxyBalanceBefore);
-
-      const ownerBalanceDiff = ownerBalanceAfter.sub(ownerBalanceBefore);
-      const proxyBalanceDiff = proxyBalanceBefore.sub(proxyBalanceAfter);
-      const acceptableGasError = ethers.BigNumber.from(5_000);
-
-      expect(ownerBalanceDiff).to.be.below(
-        acceptableGasError.mul(receipt.effectiveGasPrice)
-      );
-      expect(proxyBalanceDiff).to.be.below(gasLimit.mul(gasPrice));
-      expect(proxyBalanceDiff).to.be.below(
-        receipt.gasUsed.add(acceptableGasError).mul(receipt.effectiveGasPrice)
+      expect(proxyBalanceAfter).to.be.within(
+        proxyBalanceBefore.sub(gasFee),
+        proxyBalanceBefore.sub(1)
       );
     });
   });
@@ -152,7 +143,7 @@ describe("CoreRelayerModule", () => {
           0,
           []
         )
-      ).to.be.revertedWith("CBM: caller must be myself");
+      ).to.be.revertedWith("BM: caller must be myself");
     });
 
     it("failure: identity must be unlocked", async () => {
@@ -163,7 +154,7 @@ describe("CoreRelayerModule", () => {
       await metaTxManager.expectMetaTxFailureWithoutRefund(
         "executeThroughIdentity",
         [identityProxy.address, utils.randomAddress(), 0, []],
-        "CBM: identity must be unlocked"
+        "BM: identity must be unlocked"
       );
     });
 
@@ -185,14 +176,17 @@ describe("CoreRelayerModule", () => {
       it("failure: transfer amount exceeds balance", async () => {
         expect(await testERC20.balanceOf(identityProxy.address)).to.equal(0);
 
-        const data = testERC20.interface.encodeFunctionData("transfer", [
-          owner.address,
-          1,
-        ]);
-
         await metaTxManager.expectMetaTxFailureWithoutRefund(
           "executeThroughIdentity",
-          [identityProxy.address, testERC20.address, 0, data],
+          [
+            identityProxy.address,
+            testERC20.address,
+            0,
+            testERC20.interface.encodeFunctionData("transfer", [
+              owner.address,
+              1,
+            ]),
+          ],
           "ERC20: transfer amount exceeds balance"
         );
       });
@@ -207,14 +201,17 @@ describe("CoreRelayerModule", () => {
           totalSupply
         );
 
-        const data = testERC20.interface.encodeFunctionData("transfer", [
-          owner.address,
-          totalSupply,
-        ]);
-
         await metaTxManager.expectMetaTxSuccessWithoutRefund(
           "executeThroughIdentity",
-          [identityProxy.address, testERC20.address, 0, data],
+          [
+            identityProxy.address,
+            testERC20.address,
+            0,
+            testERC20.interface.encodeFunctionData("transfer", [
+              owner.address,
+              totalSupply,
+            ]),
+          ],
           {
             types: ["bool"],
             values: [true],

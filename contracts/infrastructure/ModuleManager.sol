@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-pragma solidity 0.8.16;
+pragma solidity 0.8.17;
 
 import "./base/Ownable.sol";
 import "../interface/IModuleManager.sol";
@@ -12,12 +12,7 @@ contract ModuleManager is Ownable, IModuleManager {
     bool internal _isInitialized;
     IModuleRegistry internal immutable _registry;
 
-    struct ModuleState {
-        bool isEnabled;
-        bool isFixed;
-    }
-
-    mapping(address => ModuleState) internal _moduleStates;
+    mapping(address => bool) internal _modules;
     mapping(bytes4 => address) internal _delegates;
 
     constructor(address registry) {
@@ -44,46 +39,27 @@ contract ModuleManager is Ownable, IModuleManager {
         override
         returns (bool)
     {
-        return _moduleStates[module].isEnabled;
-    }
-
-    function isModuleFixed(address module)
-        external
-        view
-        override
-        returns (bool)
-    {
-        return _moduleStates[module].isFixed;
+        return _modules[module];
     }
 
     function enableModule(address module) external override onlyOwner {
-        require(!_moduleStates[module].isEnabled, "MM: enabled module");
+        require(!_modules[module], "MM: module is already enabled");
         require(
             _registry.isModuleRegistered(module),
-            "MM: unregistered module"
+            "MM: module must be registered"
         );
 
-        _moduleStates[module].isEnabled = true;
+        _modules[module] = true;
 
         emit ModuleEnabled(module);
     }
 
     function disableModule(address module) external override onlyOwner {
-        require(_moduleStates[module].isEnabled, "MM: disabled module");
-        require(!_moduleStates[module].isFixed, "MM: fixed module");
+        require(_modules[module], "MM: module is already disabled");
 
-        delete _moduleStates[module];
+        delete _modules[module];
 
         emit ModuleDisabled(module);
-    }
-
-    function fixModule(address module) external override onlyOwner {
-        require(!_moduleStates[module].isFixed, "MM: fixed module");
-        require(_moduleStates[module].isEnabled, "MM: disabled module");
-
-        _moduleStates[module].isFixed = true;
-
-        emit ModuleFixed(module);
     }
 
     function getDelegate(bytes4 methodID)
@@ -100,8 +76,11 @@ contract ModuleManager is Ownable, IModuleManager {
         override
         onlyOwner
     {
-        require(_delegates[methodID] != module, "MM: enabled delegation");
-        require(_moduleStates[module].isEnabled, "MM: disabled module");
+        require(
+            _delegates[methodID] != module,
+            "MM: delegation is already enabled"
+        );
+        require(_modules[module], "MM: module must be enabled");
 
         _delegates[methodID] = module;
 
@@ -109,7 +88,10 @@ contract ModuleManager is Ownable, IModuleManager {
     }
 
     function disableDelegation(bytes4 methodID) external override onlyOwner {
-        require(_delegates[methodID] != address(0), "MM: disabled delegation");
+        require(
+            _delegates[methodID] != address(0),
+            "MM: delegation is already disabled"
+        );
 
         delete _delegates[methodID];
 

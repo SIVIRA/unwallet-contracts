@@ -42,16 +42,16 @@ class Deployer extends DeployerBase {
     return this.deployContract("Factory");
   }
 
-  public deployIdentityProxyFactory(identityAddr: string): Promise<Contract> {
-    return this.deployContract("IdentityProxyFactory", [identityAddr]);
+  public deployIdentityProxyFactory(): Promise<Contract> {
+    return this.deployContract("IdentityProxyFactory");
   }
 
   public deployModuleRegistry(): Promise<Contract> {
     return this.deployContract("ModuleRegistry");
   }
 
-  public deployModuleManager(registryAddr: string): Promise<Contract> {
-    return this.deployContract("ModuleManager", [registryAddr]);
+  public deployModuleManager(registryAddress: string): Promise<Contract> {
+    return this.deployContract("ModuleManager", [registryAddress]);
   }
 
   public deployLockManager(): Promise<Contract> {
@@ -97,32 +97,18 @@ class IdentityProxyDeployer extends DeployerBase {
   }
 
   public async deployProxy(
-    ownerAddr: string,
-    moduleManagerImplAddr: string,
-    moduleAddrs: string[],
-    delegateModuleAddrs: string[],
-    delegateMethodIDs: string[],
+    identityAddress: string,
     salt: BytesLike,
+    data: BytesLike,
     as: string = "Proxy"
   ): Promise<Contract> {
     await executeContract(
-      this.factory.createProxy(
-        ownerAddr,
-        moduleManagerImplAddr,
-        moduleAddrs,
-        delegateModuleAddrs,
-        delegateMethodIDs,
-        salt
-      )
+      this.factory.createProxy(identityAddress, salt, data)
     );
 
     return ethers.getContractAt(
       as,
-      await getProxyAddress(
-        this.factory.address,
-        salt,
-        await this.factory.identityImplementation()
-      )
+      await expectProxyAddress(this.factory.address, salt, identityAddress)
     );
   }
 }
@@ -394,7 +380,7 @@ class MetaTxManager {
   }
 }
 
-const randomString = (length: number = 8): string => {
+function randomString(length: number = 8): string {
   const chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -404,48 +390,46 @@ const randomString = (length: number = 8): string => {
   }
 
   return s;
-};
+}
 
-const randomAddress = (): string => {
+function randomAddress(): string {
   return ethers.utils.getAddress(
     ethers.utils.hexlify(ethers.utils.randomBytes(20))
   );
-};
+}
 
-const randomMethodID = (): string => {
+function randomMethodID(): string {
   return ethers.utils.hexlify(ethers.utils.randomBytes(4));
-};
+}
 
-const getLatestBlock = async (): Promise<Block> => {
+async function getLatestBlock(): Promise<Block> {
   return ethers.provider.getBlock(await ethers.provider.getBlockNumber());
-};
+}
 
-const now = async (): Promise<number> => {
+async function now(): Promise<number> {
   return (await getLatestBlock()).timestamp;
-};
+}
 
-const getProxyAddress = async (
-  fromAddr: string,
+async function expectProxyAddress(
+  fromAddress: string,
   salt: BytesLike,
-  implAddr: string
-): Promise<string> => {
+  implAddress: string
+): Promise<string> {
   return ethers.utils.getCreate2Address(
-    fromAddr,
+    fromAddress,
     salt,
     ethers.utils.keccak256(
       ethers.utils.concat([
         (await ethers.getContractFactory("Proxy")).bytecode,
-        ethers.utils.defaultAbiCoder.encode(["address"], [implAddr]),
+        ethers.utils.defaultAbiCoder.encode(["address"], [implAddress]),
       ])
     )
   );
-};
+}
 
-const executeContract = async (
-  f: Promise<ContractTransaction>
-): Promise<void> => {
+async function executeContract(f: Promise<ContractTransaction>): Promise<void> {
   (await f).wait();
-};
+}
 
 export {
   ExecutionGasConfig,
@@ -458,6 +442,6 @@ export {
   randomMethodID,
   getLatestBlock,
   now,
-  getProxyAddress,
+  expectProxyAddress,
   executeContract,
 };

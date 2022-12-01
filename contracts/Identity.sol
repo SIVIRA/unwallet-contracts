@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
-pragma solidity 0.8.16;
+pragma solidity 0.8.17;
 
 import "./Proxy.sol";
 import "./interface/IIdentity.sol";
@@ -9,8 +9,9 @@ import "./utils/Address.sol";
 contract Identity is IIdentity {
     using Address for address;
 
+    address public owner;
+
     bool internal _isInitialized;
-    address public override owner;
     IModuleManager internal _moduleManager;
 
     modifier onlyModule() {
@@ -27,7 +28,7 @@ contract Identity is IIdentity {
         address[] calldata modules,
         address[] calldata delegateModules,
         bytes4[] calldata delegateMethodIDs
-    ) external override {
+    ) external {
         require(!_isInitialized, "I: contract is already initialized");
         require(
             delegateModules.length == delegateMethodIDs.length,
@@ -100,7 +101,7 @@ contract Identity is IIdentity {
         return _moduleManager.isModuleEnabled(module);
     }
 
-    function getDelegate(bytes4 methodID) public view returns (address) {
+    function getDelegate(bytes4 methodID) external view returns (address) {
         return _moduleManager.getDelegate(methodID);
     }
 
