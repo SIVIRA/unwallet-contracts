@@ -23,10 +23,11 @@ library ECDSA {
         return signer;
     }
 
-    function recover(
-        bytes32 hash,
-        bytes memory sig
-    ) internal pure returns (address) {
+    function recover(bytes32 hash, bytes memory sig)
+        internal
+        pure
+        returns (address)
+    {
         require(sig.length == 65, "ECDSA: invalid signature length");
 
         bytes32 r;
@@ -63,9 +64,11 @@ library ECDSA {
         return recover(hash, v, r, s);
     }
 
-    function toEthSignedMessageHash(
-        bytes32 hash
-    ) internal pure returns (bytes32) {
+    function toEthSignedMessageHash(bytes32 hash)
+        internal
+        pure
+        returns (bytes32)
+    {
         return
             keccak256(
                 abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)
