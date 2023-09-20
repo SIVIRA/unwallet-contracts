@@ -1,49 +1,74 @@
 import { ethers } from "hardhat";
 
-import { BytesLike, Contract } from "ethers";
+import { BigNumberish, BytesLike } from "ethers";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { Factory } from "../typechain-types";
+
+const FACTORY_ADDRESS = "0x0419677ca62aD4818Ceb005171376AE68d0B2f1F";
 
 class Deployer {
-  public factory: Contract;
+  private runner: HardhatEthersSigner;
+  private factory: Factory;
 
-  constructor(factory: Contract) {
-    this.factory = factory;
+  constructor(runner: HardhatEthersSigner, factory: Factory) {
+    this.runner = runner;
+    this.factory = factory.connect(runner);
   }
 
-  public expectAddress(code: BytesLike, salt: BytesLike): string {
-    return ethers.utils.getCreate2Address(
-      this.factory.address,
-      salt,
-      ethers.utils.keccak256(code)
+  public async getCreate2Address(
+    code: BytesLike,
+    salt: BigNumberish
+  ): Promise<string> {
+    return ethers.getCreate2Address(
+      await this.factory.getAddress(),
+      ethers.toBeHex(salt, 32),
+      ethers.keccak256(code)
     );
   }
 
   public async deploy(
     code: BytesLike,
-    salt: BytesLike,
-    initData: BytesLike = []
+    salt: BigNumberish,
+    initData: BytesLike = new Uint8Array()
   ): Promise<void> {
     const tx = await this.factory.create(code, salt, initData);
-    console.log(`txHash: ${tx.hash}`);
     await tx.wait();
   }
 
-  public async deployAndInitializeOwnership(
+  public async deployOwnable(
     code: BytesLike,
-    salt: BytesLike,
-    owner: string
+    salt: BigNumberish
   ): Promise<void> {
-    await this.deploy(
-      code,
-      salt,
-      (
-        await ethers.getContractFactory("Ownable")
-      ).interface.encodeFunctionData("transferOwnership", [owner])
-    );
+    const initData = new ethers.Interface([
+      "function transferOwnership(address)",
+    ]).encodeFunctionData("transferOwnership", [this.runner.address]);
+
+    await this.deploy(code, salt, initData);
   }
+}
+
+async function initDeployer(runner: HardhatEthersSigner): Promise<Deployer> {
+  let factory: Factory;
+  {
+    const network = await ethers.provider.getNetwork();
+
+    switch (network.chainId) {
+      case BigInt(31337): // hardhat
+        const factoryFactory = await ethers.getContractFactory("Factory");
+        factory = await factoryFactory.deploy();
+        await factory.waitForDeployment();
+        break;
+
+      default:
+        factory = await ethers.getContractAt("Factory", FACTORY_ADDRESS);
+    }
+  }
+
+  return new Deployer(runner, factory);
 }
 
 async function isContractDeployed(address: string): Promise<boolean> {
   return (await ethers.provider.getCode(address)) !== "0x";
 }
 
-export { Deployer, isContractDeployed };
+export { Deployer, initDeployer, isContractDeployed };

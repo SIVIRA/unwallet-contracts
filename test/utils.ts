@@ -3,381 +3,340 @@ import { ethers } from "hardhat";
 
 import {
   BigNumberish,
+  Block,
   BytesLike,
-  Contract,
-  ContractReceipt,
-  ContractTransaction,
+  TransactionReceipt,
+  TransactionResponse,
 } from "ethers";
-import { Block } from "@ethersproject/abstract-provider";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import {
+  ArbRelayerModule,
+  IdentityProxyFactory,
+  ModuleRegistry,
+  RelayerModule,
+} from "../typechain-types";
 
-import * as constants from "./constants";
+class Deployer {
+  private runner: HardhatEthersSigner;
+  private moduleRegistry: ModuleRegistry | null = null;
+  private identityProxyFactory: IdentityProxyFactory | null = null;
 
-interface ExecutionGasConfig {
-  price: BigNumberish;
-  limit: BigNumberish;
-  token: string;
-  refundTo: string;
-}
+  constructor(runner: HardhatEthersSigner) {
+    this.runner = runner;
+  }
 
-interface ExecutionResult {
-  types: string[];
-  values: any[];
-}
+  public setModuleRegistry(moduleRegistry: ModuleRegistry): void {
+    this.moduleRegistry = moduleRegistry.connect(this.runner);
+  }
 
-class DeployerBase {
-  public async deployContract(
+  public setIdentityProxyFactory(identityProxyFactory: IdentityProxyFactory) {
+    this.identityProxyFactory = identityProxyFactory.connect(this.runner);
+  }
+
+  public async deploy(
     name: string,
-    args: any[] = []
-  ): Promise<Contract> {
+    args: any[] = [],
+    as?: string
+  ): Promise<any> {
     const factory = await ethers.getContractFactory(name);
-    const contract = await factory.deploy(...args);
+    const contract = await factory.connect(this.runner).deploy(...args);
+    await contract.waitForDeployment();
 
-    return contract.deployed();
-  }
-}
-
-class Deployer extends DeployerBase {
-  public deployFactory(): Promise<Contract> {
-    return this.deployContract("Factory");
-  }
-
-  public deployIdentityProxyFactory(): Promise<Contract> {
-    return this.deployContract("IdentityProxyFactory");
-  }
-
-  public deployModuleRegistry(): Promise<Contract> {
-    return this.deployContract("ModuleRegistry");
-  }
-
-  public deployModuleManager(registryAddress: string): Promise<Contract> {
-    return this.deployContract("ModuleManager", [registryAddress]);
-  }
-
-  public deployLockManager(): Promise<Contract> {
-    return this.deployContract("LockManager", [constants.LOCK_PERIOD]);
-  }
-
-  public deployIdentity(): Promise<Contract> {
-    return this.deployContract("Identity", []);
-  }
-}
-
-class ModuleDeployer extends DeployerBase {
-  public registry: Contract;
-
-  constructor(registry: Contract) {
-    super();
-
-    this.registry = registry;
+    return ethers.getContractAt(as ?? name, await contract.getAddress());
   }
 
   public async deployModule(
     name: string,
     args: any[] = [],
-    isRegistered: boolean = false
-  ): Promise<Contract> {
-    const contract = await this.deployContract(name, args);
+    withRegistration: boolean = false
+  ): Promise<any> {
+    const module = await this.deploy(name, args);
 
-    if (isRegistered) {
-      await executeContract(this.registry.registerModule(contract.address));
+    if (withRegistration) {
+      if (this.moduleRegistry === null) {
+        throw new Error("module registry not set");
+      }
+
+      await waitTx(
+        this.moduleRegistry.registerModule(await module.getAddress())
+      );
     }
 
-    return contract;
-  }
-}
-
-class IdentityProxyDeployer extends DeployerBase {
-  public factory: Contract;
-
-  constructor(factory: Contract) {
-    super();
-
-    this.factory = factory;
+    return module;
   }
 
-  public async deployProxy(
-    identityAddress: string,
-    salt: BytesLike,
-    data: BytesLike,
+  public async deployIdentityProxy(
+    identityImplAddress: string,
+    salt: BigNumberish,
+    initData: BytesLike,
     as: string = "Proxy"
-  ): Promise<Contract> {
-    await executeContract(
-      this.factory.createProxy(identityAddress, salt, data)
+  ): Promise<any> {
+    if (this.identityProxyFactory === null) {
+      throw new Error("identity proxy factory not set");
+    }
+
+    await waitTx(
+      this.identityProxyFactory.createProxy(
+        identityImplAddress,
+        ethers.toBeHex(salt, 32),
+        initData
+      )
     );
 
     return ethers.getContractAt(
       as,
-      await expectProxyAddress(this.factory.address, salt, identityAddress)
+      await getProxyCreate2Address(
+        await this.identityProxyFactory.getAddress(),
+        salt,
+        identityImplAddress
+      )
     );
   }
 }
 
-class MetaTxManager {
-  public signers: SignerWithAddress[] = [];
-  public identity: Contract;
-  public relayerModule: Contract;
+interface IdentityOpConfig {
+  gasPrice: bigint;
+  gasLimit: bigint;
+  refundToAddress?: string;
+}
+
+interface IdentityOpResult {
+  types: string[];
+  values: any[];
+}
+
+class IdentityOpManager {
+  private identityAddress: string;
+  private owner: HardhatEthersSigner;
+  private relayer: HardhatEthersSigner;
+  private signers: HardhatEthersSigner[] = [];
+  private relayerModule: RelayerModule | ArbRelayerModule;
 
   constructor(
-    signers: SignerWithAddress[],
-    identity: Contract,
-    relayerModule: Contract
+    identityAddress: string,
+    owner: HardhatEthersSigner,
+    relayer: HardhatEthersSigner,
+    relayerModule: RelayerModule | ArbRelayerModule
   ) {
-    this.setSigners(signers);
-    this.identity = identity;
-    this.relayerModule = relayerModule;
+    this.identityAddress = identityAddress;
+    this.owner = owner;
+    this.relayer = relayer;
+    this.relayerModule = relayerModule.connect(relayer);
   }
 
-  public setSigners(
-    signers: SignerWithAddress[],
-    isOwnerIncluded: boolean = true
-  ): void {
-    if (signers.length == 0) {
-      this.signers = signers;
-      return;
-    }
+  public setOwner(owner: HardhatEthersSigner): void {
+    this.owner = owner;
+  }
 
-    let orderedSigners: SignerWithAddress[] = [];
+  public setRelayer(relayer: HardhatEthersSigner): void {
+    this.relayer = relayer;
+    this.relayerModule = this.relayerModule.connect(relayer);
+  }
 
-    if (isOwnerIncluded) {
-      orderedSigners.push(signers.shift()!);
-    }
+  public setSigners(signers: HardhatEthersSigner[]): void {
+    this.signers = signers.sort((a, b) => {
+      const diff = ethers.toBigInt(a.address) - ethers.toBigInt(b.address);
 
-    signers.sort((a, b) => {
-      const diff = ethers.BigNumber.from(a.address).sub(
-        ethers.BigNumber.from(b.address)
-      );
-
-      return diff.isNegative() ? -1 : diff.isZero() ? 0 : 1;
+      return diff < 0 ? -1 : diff === BigInt(0) ? 0 : 1;
     });
-
-    orderedSigners = orderedSigners.concat(signers);
-
-    this.signers = orderedSigners;
   }
 
-  public async sign(hash: Uint8Array): Promise<Uint8Array> {
-    let sig = new Uint8Array();
+  public async sign(hash: BytesLike): Promise<BytesLike> {
+    const message = ethers.getBytes(hash);
+
+    let sig = await this.owner.signMessage(message);
     for (const signer of this.signers) {
-      sig = ethers.utils.concat([sig, await signer.signMessage(hash)]);
+      sig = ethers.concat([sig, await signer.signMessage(message)]);
     }
 
     return sig;
   }
 
-  public async prepareMetaTx(
-    functionFragment: string,
-    args: any[],
-    gasConfig: ExecutionGasConfig
-  ): Promise<{ txHash: Uint8Array; executor: Promise<ContractTransaction> }> {
-    const data = this.relayerModule.interface.encodeFunctionData(
-      functionFragment,
-      args
-    );
-    const txHash = await this.getTxHash(data, gasConfig);
-    const sig = await this.sign(txHash);
+  public async prepareTx(
+    data: BytesLike,
+    config?: IdentityOpConfig
+  ): Promise<{
+    identityOpHash: BytesLike;
+    transact: Promise<TransactionResponse>;
+  }> {
+    config ??= {
+      gasPrice: BigInt(0),
+      gasLimit: BigInt(0),
+      refundToAddress: ethers.ZeroAddress,
+    };
+
+    const hash = await this._getIdentityOpHash(data, config);
+    const sig = await this.sign(hash);
 
     return {
-      txHash: txHash,
-      executor: this.relayerModule.execute(
-        this.identity.address,
+      identityOpHash: hash,
+      transact: this.relayerModule.execute(
+        this.identityAddress,
         data,
-        gasConfig.price,
-        gasConfig.limit,
-        gasConfig.refundTo,
+        config.gasPrice,
+        config.gasLimit,
+        config.refundToAddress ?? (await this.relayer.getAddress()),
         sig
       ),
     };
   }
 
-  public prepareMetaTxWithoutRefund(
-    functionFragment: string,
-    args: any[]
-  ): Promise<{ txHash: Uint8Array; executor: Promise<ContractTransaction> }> {
-    return this.prepareMetaTx(
-      functionFragment,
-      args,
-      constants.EMPTY_EXECUTION_GAS_CONFIG
-    );
+  public async prepareTxToPing(config?: IdentityOpConfig): Promise<{
+    identityOpHash: BytesLike;
+    transact: Promise<TransactionResponse>;
+  }> {
+    const data = this.relayerModule.interface.encodeFunctionData("ping");
+
+    return this.prepareTx(data, config);
   }
 
-  public async executeMetaTx(
-    functionFragment: string,
-    args: any[],
-    gasConfig: ExecutionGasConfig
-  ): Promise<ContractTransaction> {
-    const { executor } = await this.prepareMetaTx(
-      functionFragment,
-      args,
-      gasConfig
+  public async prepareTxToExecuteThroughIdentity(
+    args: [string, string, BigNumberish, BytesLike],
+    config?: IdentityOpConfig
+  ): Promise<{
+    identityOpHash: BytesLike;
+    transact: Promise<TransactionResponse>;
+  }> {
+    const data = this.relayerModule.interface.encodeFunctionData(
+      "executeThroughIdentity",
+      args
     );
 
-    return executor;
+    return this.prepareTx(data, config);
   }
 
-  public executeMetaTxWithoutRefund(
-    functionFragment: string,
-    args: any[]
-  ): Promise<ContractTransaction> {
-    return this.executeMetaTx(
-      functionFragment,
-      args,
-      constants.EMPTY_EXECUTION_GAS_CONFIG
-    );
+  public async ping(config?: IdentityOpConfig): Promise<{
+    identityOpHash: BytesLike;
+    txReceipt: TransactionReceipt;
+  }> {
+    const { identityOpHash, transact } = await this.prepareTxToPing(config);
+
+    return {
+      identityOpHash: identityOpHash,
+      txReceipt: await waitTx(transact),
+    };
   }
 
-  public async expectMetaTxSuccess(
-    functionFragment: string,
-    args: any[],
-    gasConfig: ExecutionGasConfig,
-    result: ExecutionResult
-  ): Promise<ContractReceipt> {
-    const { txHash, executor } = await this.prepareMetaTx(
-      functionFragment,
-      args,
-      gasConfig
-    );
+  public async executeThroughIdentity(
+    args: [string, string, BigNumberish, BytesLike],
+    config?: IdentityOpConfig
+  ): Promise<{
+    identityOpHash: BytesLike;
+    txReceipt: TransactionReceipt;
+  }> {
+    const { identityOpHash, transact } =
+      await this.prepareTxToExecuteThroughIdentity(args, config);
 
-    const tx = await executor;
-    const receipt = await tx.wait();
+    return {
+      identityOpHash: identityOpHash,
+      txReceipt: await waitTx(transact),
+    };
+  }
 
-    const assertion = expect(receipt.transactionHash);
-    await assertion.to
-      .emit(this.relayerModule, "Executed")
+  public async expectIdentityOpSuccess(
+    identityOpHash: BytesLike,
+    txReceipt: TransactionReceipt,
+    result?: IdentityOpResult
+  ): Promise<void> {
+    await expect(txReceipt.hash)
+      .to.emit(this.relayerModule, "Executed")
       .withArgs(
-        this.identity.address,
+        this.identityAddress,
         true,
-        ethers.utils.hexlify(this._getExecutionResultBytes(result)),
-        ethers.utils.hexlify(txHash)
+        this._getIdentityOpResultBytes(result ?? { types: [], values: [] }),
+        identityOpHash
       );
-
-    if (ethers.BigNumber.from(gasConfig.price).gt(0)) {
-      await assertion.to.emit(this.relayerModule, "Refunded");
-    }
-
-    return receipt;
   }
 
-  public expectMetaTxSuccessWithoutRefund(
-    functionFragment: string,
-    args: any[],
-    result: ExecutionResult
-  ): Promise<ContractReceipt> {
-    return this.expectMetaTxSuccess(
-      functionFragment,
-      args,
-      constants.EMPTY_EXECUTION_GAS_CONFIG,
-      result
-    );
-  }
-
-  public async expectMetaTxFailure(
-    functionFragment: string,
-    args: any[],
-    gasConfig: ExecutionGasConfig,
+  public async expectIdentityOpFailure(
+    identityOpHash: BytesLike,
+    txReceipt: TransactionReceipt,
     message: string
-  ): Promise<ContractReceipt> {
-    const { txHash, executor } = await this.prepareMetaTx(
-      functionFragment,
-      args,
-      gasConfig
-    );
-
-    const tx = await executor;
-    const receipt = await tx.wait();
-
-    const assertion = expect(tx.hash);
-    await assertion.to
-      .emit(this.relayerModule, "Executed")
+  ): Promise<void> {
+    await expect(txReceipt.hash)
+      .to.emit(this.relayerModule, "Executed")
       .withArgs(
-        this.identity.address,
+        this.identityAddress,
         false,
-        ethers.utils.hexlify(this._getErrorResultBytes(message)),
-        ethers.utils.hexlify(txHash)
+        this._getErrorResultBytes(message),
+        identityOpHash
       );
-
-    if (ethers.BigNumber.from(gasConfig.price).gt(0)) {
-      await assertion.to.emit(this.relayerModule, "Refunded");
-    }
-
-    return receipt;
   }
 
-  public expectMetaTxFailureWithoutRefund(
-    functionFragment: string,
-    args: any[],
-    message: string
-  ): Promise<ContractReceipt> {
-    return this.expectMetaTxFailure(
-      functionFragment,
-      args,
-      constants.EMPTY_EXECUTION_GAS_CONFIG,
-      message
-    );
-  }
-
-  public async getTxHash(
+  private async _getIdentityOpHash(
     data: BytesLike,
-    gasConfig: ExecutionGasConfig
-  ): Promise<Uint8Array> {
-    const network = await ethers.provider.getNetwork();
-    const nonce = await this.relayerModule.getNonce(this.identity.address);
+    config: IdentityOpConfig
+  ): Promise<BytesLike> {
+    const relayerModuleAddress = await this.relayerModule.getAddress();
 
-    return ethers.utils.arrayify(
-      ethers.utils.solidityKeccak256(
-        [
-          "bytes1",
-          "bytes1",
-          "uint256",
-          "address",
-          "address",
-          "uint256",
-          "bytes",
-          "uint256",
-          "uint256",
-          "address",
-          "address",
-        ],
-        [
-          0x19,
-          0x00,
-          network.chainId,
-          this.relayerModule.address,
-          this.identity.address,
-          nonce,
-          data,
-          gasConfig.price,
-          gasConfig.limit,
-          gasConfig.token,
-          gasConfig.refundTo,
-        ]
-      )
+    const network = await ethers.provider.getNetwork();
+    const nonce = await this.relayerModule.getNonce(this.identityAddress);
+
+    return ethers.solidityPackedKeccak256(
+      [
+        "bytes1",
+        "bytes1",
+        "uint256",
+        "address",
+        "address",
+        "uint256",
+        "bytes",
+        "uint256",
+        "uint256",
+        "address",
+        "address",
+      ],
+      [
+        "0x19",
+        "0x00",
+        network.chainId,
+        relayerModuleAddress,
+        this.identityAddress,
+        nonce,
+        data,
+        config.gasPrice,
+        config.gasLimit,
+        ethers.ZeroAddress,
+        config.refundToAddress ?? (await this.relayer.getAddress()),
+      ]
     );
   }
 
-  public getTxHashWithoutRefund(data: BytesLike): Promise<Uint8Array> {
-    return this.getTxHash(data, constants.EMPTY_EXECUTION_GAS_CONFIG);
-  }
-
-  private _getExecutionResultBytes(result: ExecutionResult): Uint8Array {
+  private _getIdentityOpResultBytes(result: IdentityOpResult): BytesLike {
     if (result.types.length === 0) {
       return new Uint8Array();
     }
 
-    return ethers.utils.arrayify(
-      ethers.utils.defaultAbiCoder.encode(
-        ["bytes"],
-        [ethers.utils.defaultAbiCoder.encode(result.types, result.values)]
-      )
+    return ethers.AbiCoder.defaultAbiCoder().encode(
+      ["bytes"],
+      [ethers.AbiCoder.defaultAbiCoder().encode(result.types, result.values)]
     );
   }
 
-  private _getErrorResultBytes(message: string): Uint8Array {
-    return ethers.utils.concat([
+  private _getErrorResultBytes(message: string): BytesLike {
+    return ethers.concat([
       "0x08c379a0",
-      ethers.utils.defaultAbiCoder.encode(["string"], [message]),
+      ethers.AbiCoder.defaultAbiCoder().encode(["string"], [message]),
     ]);
   }
+}
+
+function bigintMin(...values: bigint[]): bigint {
+  if (values.length === 0) {
+    throw new Error("no values");
+  }
+  if (values.length === 1) {
+    return values[0];
+  }
+
+  let min = values.shift()!;
+  for (const value of values) {
+    if (value < min) {
+      min = value;
+    }
+  }
+
+  return min;
 }
 
 function randomString(length: number = 8): string {
@@ -392,56 +351,76 @@ function randomString(length: number = 8): string {
   return s;
 }
 
+function randomUint256(): BigNumberish {
+  return ethers.toBigInt(ethers.randomBytes(32));
+}
+
 function randomAddress(): string {
-  return ethers.utils.getAddress(
-    ethers.utils.hexlify(ethers.utils.randomBytes(20))
-  );
+  return ethers.getAddress(ethers.hexlify(ethers.randomBytes(20)));
 }
 
 function randomMethodID(): string {
-  return ethers.utils.hexlify(ethers.utils.randomBytes(4));
-}
-
-async function getLatestBlock(): Promise<Block> {
-  return ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+  return ethers.hexlify(ethers.randomBytes(4));
 }
 
 async function now(): Promise<number> {
-  return (await getLatestBlock()).timestamp;
+  return new Promise<number>((resolve, reject) => {
+    ethers.provider
+      .getBlockNumber()
+      .then((blockNumber: number) => {
+        ethers.provider
+          .getBlock(blockNumber)
+          .then((block: Block | null) => {
+            if (block === null) {
+              reject(new Error("block not found"));
+              return;
+            }
+
+            resolve(block.timestamp);
+          })
+          .catch((e) => reject(e));
+      })
+      .catch((e) => reject(e));
+  });
 }
 
-async function expectProxyAddress(
+async function getProxyCreate2Address(
   fromAddress: string,
-  salt: BytesLike,
+  salt: BigNumberish,
   implAddress: string
 ): Promise<string> {
-  return ethers.utils.getCreate2Address(
+  return ethers.getCreate2Address(
     fromAddress,
-    salt,
-    ethers.utils.keccak256(
-      ethers.utils.concat([
+    ethers.toBeHex(salt, 32),
+    ethers.keccak256(
+      ethers.concat([
         (await ethers.getContractFactory("Proxy")).bytecode,
-        ethers.utils.defaultAbiCoder.encode(["address"], [implAddress]),
+        ethers.AbiCoder.defaultAbiCoder().encode(["address"], [implAddress]),
       ])
     )
   );
 }
 
-async function executeContract(f: Promise<ContractTransaction>): Promise<void> {
-  (await f).wait();
+async function waitTx(
+  transact: Promise<TransactionResponse>
+): Promise<TransactionReceipt> {
+  const tx = await transact;
+  const txReceipt = await tx.wait();
+
+  return txReceipt!;
 }
 
 export {
-  ExecutionGasConfig,
   Deployer,
-  ModuleDeployer,
-  IdentityProxyDeployer,
-  MetaTxManager,
+  IdentityOpConfig,
+  IdentityOpResult,
+  IdentityOpManager,
+  bigintMin,
   randomString,
+  randomUint256,
   randomAddress,
   randomMethodID,
-  getLatestBlock,
   now,
-  expectProxyAddress,
-  executeContract,
+  getProxyCreate2Address,
+  waitTx,
 };

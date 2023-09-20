@@ -1,33 +1,50 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-import { Contract } from "ethers";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import {
+  ModuleManager,
+  ModuleRegistry,
+  TestModule,
+} from "../../typechain-types";
 
 import * as utils from "../utils";
 
 describe("ModuleRegistry", () => {
-  const deployer = new utils.Deployer();
+  let deployer: utils.Deployer;
 
-  let owner: SignerWithAddress;
-  let other: SignerWithAddress;
+  let owner: HardhatEthersSigner;
+  let other: HardhatEthersSigner;
 
-  let moduleRegistry: Contract;
-  let moduleManager: Contract;
+  let moduleRegistry: ModuleRegistry;
+  let moduleManager: ModuleManager;
 
-  let testModule: Contract;
+  let testModule: TestModule;
 
   before(async () => {
     [owner, other] = await ethers.getSigners();
+
+    deployer = new utils.Deployer(owner);
   });
 
   beforeEach(async () => {
-    moduleRegistry = await deployer.deployModuleRegistry();
-    moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
+    moduleRegistry = await deployer.deploy("ModuleRegistry");
+    deployer.setModuleRegistry(moduleRegistry);
 
-    const moduleDeployer = new utils.ModuleDeployer(moduleRegistry);
+    moduleManager = await deployer.deploy("ModuleManager", [
+      await moduleRegistry.getAddress(),
+    ]);
 
-    testModule = await moduleDeployer.deployModule("TestModule");
+    testModule = await deployer.deployModule("TestModule");
+  });
+
+  describe("initial state", () => {
+    it("success", async () => {
+      expect(await moduleRegistry.owner()).to.equal(await owner.getAddress());
+      expect(
+        await moduleRegistry.isModuleRegistered(await testModule.getAddress())
+      ).to.be.false;
+    });
   });
 
   describe("registerModule", () => {
@@ -44,48 +61,48 @@ describe("ModuleRegistry", () => {
     });
 
     it("success -> failure: module is already registered", async () => {
-      expect(await moduleRegistry.isModuleRegistered(testModule.address)).to.be
-        .false;
-
-      await expect(moduleRegistry.registerModule(testModule.address))
+      await expect(moduleRegistry.registerModule(await testModule.getAddress()))
         .to.emit(moduleRegistry, "ModuleRegistered")
-        .withArgs(testModule.address);
+        .withArgs(await testModule.getAddress());
 
-      expect(await moduleRegistry.isModuleRegistered(testModule.address)).to.be
-        .true;
+      expect(
+        await moduleRegistry.isModuleRegistered(await testModule.getAddress())
+      ).to.be.true;
 
       await expect(
-        moduleRegistry.registerModule(testModule.address)
+        moduleRegistry.registerModule(await testModule.getAddress())
       ).to.be.revertedWith("MR: module is already registered");
     });
   });
 
   describe("deregisterModule", () => {
     beforeEach(async () => {
-      await utils.executeContract(
-        moduleRegistry.registerModule(testModule.address)
+      await utils.waitTx(
+        moduleRegistry.registerModule(await testModule.getAddress())
       );
     });
 
     it("failure: caller must be the owner", async () => {
       await expect(
-        moduleRegistry.connect(other).deregisterModule(testModule.address)
+        moduleRegistry
+          .connect(other)
+          .deregisterModule(await testModule.getAddress())
       ).to.be.revertedWith("O: caller must be the owner");
     });
 
     it("success -> failure: module is already deregistered", async () => {
-      expect(await moduleRegistry.isModuleRegistered(testModule.address)).to.be
-        .true;
-
-      await expect(moduleRegistry.deregisterModule(testModule.address))
+      await expect(
+        moduleRegistry.deregisterModule(await testModule.getAddress())
+      )
         .to.emit(moduleRegistry, "ModuleDeregistered")
-        .withArgs(testModule.address);
+        .withArgs(await testModule.getAddress());
 
-      expect(await moduleRegistry.isModuleRegistered(testModule.address)).to.be
-        .false;
+      expect(
+        await moduleRegistry.isModuleRegistered(await testModule.getAddress())
+      ).to.be.false;
 
       await expect(
-        moduleRegistry.deregisterModule(testModule.address)
+        moduleRegistry.deregisterModule(await testModule.getAddress())
       ).to.be.revertedWith("MR: module is already deregistered");
     });
   });

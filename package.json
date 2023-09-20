@@ -1,16 +1,28 @@
 {
   "name": "unwallet-contracts",
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  },
   "scripts": {
+    "build": "hardhat compile",
+    "commit": "cz",
     "test": "hardhat test"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "4.8.0"
+    "@openzeppelin/contracts": "4.9.3"
   },
   "devDependencies": {
-    "@commitlint/cli": "17.5.0",
-    "@commitlint/config-conventional": "17.4.4",
-    "@nomicfoundation/hardhat-toolbox": "2.0.2",
-    "hardhat": "2.13.0",
+    "@commitlint/cli": "17.7.1",
+    "@commitlint/config-conventional": "17.7.0",
+    "@nomicfoundation/hardhat-ethers": "3.0.4",
+    "@nomicfoundation/hardhat-network-helpers": "1.0.9",
+    "@nomicfoundation/hardhat-toolbox": "3.0.0",
+    "commitizen": "4.3.0",
+    "cz-conventional-changelog": "3.3.0",
+    "ethers": "6.7.1",
+    "hardhat": "2.17.3",
     "husky": "8.0.3"
   }
 }

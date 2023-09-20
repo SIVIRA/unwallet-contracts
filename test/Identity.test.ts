@@ -1,58 +1,72 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-import { Contract } from "ethers";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import {
+  Identity,
+  IdentityProxyFactory,
+  ModuleManager,
+  ModuleRegistry,
+  TestERC20,
+  TestModule,
+} from "../typechain-types";
 
 import * as constants from "./constants";
 import * as utils from "./utils";
 
 describe("Identity", () => {
-  const deployer = new utils.Deployer();
+  let deployer: utils.Deployer;
 
-  let owner: SignerWithAddress;
-  let other: SignerWithAddress;
+  let identityProxyOwner1: HardhatEthersSigner;
+  let identityProxyOwner2: HardhatEthersSigner;
 
-  let identityProxyFactory: Contract;
-  let moduleRegistry: Contract;
-  let moduleManager: Contract;
+  let identityProxyFactory: IdentityProxyFactory;
+  let identity: Identity;
 
-  let testModule1: Contract;
-  let testModule2: Contract;
+  let moduleRegistry: ModuleRegistry;
+  let moduleManager: ModuleManager;
 
-  let identity: Contract;
-  let identityProxy1: Contract;
-  let identityProxy2: Contract;
-  let moduleManagerProxy1: Contract;
-  let moduleManagerProxy2: Contract;
+  let testModule1: TestModule;
+  let testModule2: TestModule;
+
+  let identityProxy1: Identity;
+  let moduleManagerProxy1: ModuleManager;
+
+  let identityProxy2: Identity;
+  let moduleManagerProxy2: ModuleManager;
 
   before(async () => {
-    [owner, other] = await ethers.getSigners();
+    let runner;
+    [runner, identityProxyOwner1, identityProxyOwner2] =
+      await ethers.getSigners();
+
+    deployer = new utils.Deployer(runner);
   });
 
   beforeEach(async () => {
-    moduleRegistry = await deployer.deployModuleRegistry();
-    moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
-    identity = await deployer.deployIdentity();
-    identityProxyFactory = await deployer.deployIdentityProxyFactory();
+    identityProxyFactory = await deployer.deploy("IdentityProxyFactory");
+    deployer.setIdentityProxyFactory(identityProxyFactory);
 
-    const moduleDeployer = new utils.ModuleDeployer(moduleRegistry);
+    identity = await deployer.deploy("Identity");
 
-    testModule1 = await moduleDeployer.deployModule("TestModule", [], true);
-    testModule2 = await moduleDeployer.deployModule("TestModule", [], true);
+    moduleRegistry = await deployer.deploy("ModuleRegistry");
+    deployer.setModuleRegistry(moduleRegistry);
 
-    const identityProxyDeployer = new utils.IdentityProxyDeployer(
-      identityProxyFactory
-    );
+    moduleManager = await deployer.deploy("ModuleManager", [
+      await moduleRegistry.getAddress(),
+    ]);
 
-    identityProxy1 = await identityProxyDeployer.deployProxy(
-      identity.address,
-      ethers.utils.randomBytes(32),
+    testModule1 = await deployer.deployModule("TestModule", [], true);
+    testModule2 = await deployer.deployModule("TestModule", [], true);
+
+    identityProxy1 = await deployer.deployIdentityProxy(
+      await identity.getAddress(),
+      utils.randomUint256(),
       identity.interface.encodeFunctionData("initialize", [
-        owner.address,
-        moduleManager.address,
-        [testModule1.address],
-        [testModule1.address],
+        identityProxyOwner1.address,
+        await moduleManager.getAddress(),
+        [await testModule1.getAddress()],
+        [await testModule1.getAddress()],
         [constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE],
       ]),
       "Identity"
@@ -62,12 +76,12 @@ describe("Identity", () => {
       await identityProxy1.moduleManager()
     );
 
-    identityProxy2 = await identityProxyDeployer.deployProxy(
-      identity.address,
-      ethers.utils.randomBytes(32),
+    identityProxy2 = await deployer.deployIdentityProxy(
+      await identity.getAddress(),
+      utils.randomUint256(),
       identity.interface.encodeFunctionData("initialize", [
-        other.address,
-        moduleManager.address,
+        identityProxyOwner2.address,
+        await moduleManager.getAddress(),
         [],
         [],
         [],
@@ -82,27 +96,35 @@ describe("Identity", () => {
 
   describe("initial state", () => {
     it("success", async () => {
-      expect(await identityProxy1.owner()).to.equal(owner.address);
-      expect(await identityProxy1.isModuleEnabled(testModule1.address)).to.be
-        .true;
-      expect(await identityProxy1.isModuleEnabled(testModule2.address)).to.be
-        .false;
+      expect(await identityProxy1.owner()).to.equal(
+        identityProxyOwner1.address
+      );
+      expect(
+        await identityProxy1.isModuleEnabled(await testModule1.getAddress())
+      ).to.be.true;
+      expect(
+        await identityProxy1.isModuleEnabled(await testModule2.getAddress())
+      ).to.be.false;
       expect(
         await identityProxy1.getDelegate(
           constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE
         )
-      ).to.equal(testModule1.address);
+      ).to.equal(await testModule1.getAddress());
 
-      expect(await identityProxy2.owner()).to.equal(other.address);
-      expect(await identityProxy2.isModuleEnabled(testModule1.address)).to.be
-        .false;
-      expect(await identityProxy2.isModuleEnabled(testModule2.address)).to.be
-        .false;
+      expect(await identityProxy2.owner()).to.equal(
+        identityProxyOwner2.address
+      );
+      expect(
+        await identityProxy2.isModuleEnabled(await testModule1.getAddress())
+      ).to.be.false;
+      expect(
+        await identityProxy2.isModuleEnabled(await testModule2.getAddress())
+      ).to.be.false;
       expect(
         await identityProxy2.getDelegate(
           constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE
         )
-      ).to.equal(ethers.constants.AddressZero);
+      ).to.equal(ethers.ZeroAddress);
     });
   });
 
@@ -110,8 +132,8 @@ describe("Identity", () => {
     it("failure: contract is already initialized", async () => {
       await expect(
         identityProxy1.initialize(
-          other.address,
-          moduleManager.address,
+          identityProxyOwner2.address,
+          await moduleManager.getAddress(),
           [],
           [],
           []
@@ -120,19 +142,15 @@ describe("Identity", () => {
     });
 
     it("failure: delegate modules length and delegate method ids length do not match", async () => {
-      const identityProxyDeployer = new utils.IdentityProxyDeployer(
-        identityProxyFactory
-      );
-
       await expect(
-        identityProxyDeployer.deployProxy(
-          identity.address,
-          ethers.utils.randomBytes(32),
+        deployer.deployIdentityProxy(
+          await identity.getAddress(),
+          utils.randomUint256(),
           identity.interface.encodeFunctionData("initialize", [
-            other.address,
-            moduleManager.address,
-            [testModule1.address],
-            [testModule1.address],
+            identityProxyOwner1.address,
+            await moduleManager.getAddress(),
+            [await testModule1.getAddress()],
+            [await testModule1.getAddress()],
             [],
           ])
         )
@@ -145,25 +163,35 @@ describe("Identity", () => {
   describe("setOwner", () => {
     it("failure: caller must be an enabled module", async () => {
       await expect(
-        testModule2.setOwner(identityProxy1.address, other.address)
+        testModule2.setOwner(
+          await identityProxy1.getAddress(),
+          identityProxyOwner2.address
+        )
       ).to.be.revertedWith("I: caller must be an enabled module");
     });
 
     it("failure: owner must not be the zero address", async () => {
       await expect(
         testModule1.setOwner(
-          identityProxy1.address,
-          ethers.constants.AddressZero
+          await identityProxy1.getAddress(),
+          ethers.ZeroAddress
         )
       ).to.be.revertedWith("I: owner must not be the zero address");
     });
 
     it("success", async () => {
-      await expect(testModule1.setOwner(identityProxy1.address, other.address))
+      await expect(
+        testModule1.setOwner(
+          await identityProxy1.getAddress(),
+          identityProxyOwner2.address
+        )
+      )
         .to.emit(identityProxy1, "OwnershipTransferred")
-        .withArgs(owner.address, other.address);
+        .withArgs(identityProxyOwner1.address, identityProxyOwner2.address);
 
-      expect(await identityProxy1.owner()).to.equal(other.address);
+      expect(await identityProxy1.owner()).to.equal(
+        identityProxyOwner2.address
+      );
     });
   });
 
@@ -171,7 +199,7 @@ describe("Identity", () => {
     it("failure: caller must be an enabled module", async () => {
       await expect(
         testModule2.setModuleManager(
-          identityProxy1.address,
+          await identityProxy1.getAddress(),
           utils.randomAddress()
         )
       ).to.be.revertedWith("I: caller must be an enabled module");
@@ -180,7 +208,7 @@ describe("Identity", () => {
     it("failure: module manager must be an existing contract address", async () => {
       await expect(
         testModule1.setModuleManager(
-          identityProxy1.address,
+          await identityProxy1.getAddress(),
           utils.randomAddress()
         )
       ).to.be.revertedWith(
@@ -191,15 +219,18 @@ describe("Identity", () => {
     it("success", async () => {
       await expect(
         testModule1.setModuleManager(
-          identityProxy1.address,
-          moduleManagerProxy2.address
+          await identityProxy1.getAddress(),
+          await moduleManagerProxy2.getAddress()
         )
       )
         .to.emit(identityProxy1, "ModuleManagerSwitched")
-        .withArgs(moduleManagerProxy1.address, moduleManagerProxy2.address);
+        .withArgs(
+          await moduleManagerProxy1.getAddress(),
+          await moduleManagerProxy2.getAddress()
+        );
 
       expect(await identityProxy1.moduleManager()).to.equal(
-        moduleManagerProxy2.address
+        await moduleManagerProxy2.getAddress()
       );
     });
   });
@@ -208,10 +239,10 @@ describe("Identity", () => {
     it("failure: caller must be an enabled module", async () => {
       await expect(
         testModule2.execute(
-          identityProxy1.address,
+          await identityProxy1.getAddress(),
           utils.randomAddress(),
           0,
-          []
+          new Uint8Array()
         )
       ).to.be.revertedWith("I: caller must be an enabled module");
     });
@@ -219,10 +250,10 @@ describe("Identity", () => {
     it("failure: execution target must not be the zero address", async () => {
       await expect(
         testModule1.execute(
-          identityProxy1.address,
-          ethers.constants.AddressZero,
+          await identityProxy1.getAddress(),
+          ethers.ZeroAddress,
           0,
-          []
+          new Uint8Array()
         )
       ).to.be.revertedWith("I: execution target must not be the zero address");
     });
@@ -230,30 +261,27 @@ describe("Identity", () => {
     describe("ModuleManager.enableModule", () => {
       it("success", async () => {
         await testModule1.execute(
-          identityProxy1.address,
-          moduleManagerProxy1.address,
+          await identityProxy1.getAddress(),
+          await moduleManagerProxy1.getAddress(),
           0,
           moduleManager.interface.encodeFunctionData("enableModule", [
-            testModule2.address,
+            await testModule2.getAddress(),
           ])
         );
 
-        expect(await identityProxy1.isModuleEnabled(testModule2.address)).to.be
-          .true;
-        expect(await identityProxy2.isModuleEnabled(testModule2.address)).to.be
-          .false;
+        expect(
+          await identityProxy1.isModuleEnabled(await testModule2.getAddress())
+        ).to.be.true;
       });
     });
 
     describe("ERC20.transfer", () => {
-      const totalSupply: number = 100;
+      const totalSupply: bigint = BigInt(100);
 
-      let testERC20: Contract;
+      let testERC20: TestERC20;
 
       beforeEach(async () => {
-        const deployer = new utils.Deployer();
-
-        testERC20 = await deployer.deployContract("TestERC20", [
+        testERC20 = await deployer.deploy("TestERC20", [
           "unWallet Coin",
           "UWC",
           totalSupply,
@@ -261,15 +289,13 @@ describe("Identity", () => {
       });
 
       it("failure: transfer amount exceeds balance", async () => {
-        expect(await testERC20.balanceOf(identityProxy1.address)).to.equal(0);
-
         await expect(
           testModule1.execute(
-            identityProxy1.address,
-            testERC20.address,
+            await identityProxy1.getAddress(),
+            await testERC20.getAddress(),
             0,
             testERC20.interface.encodeFunctionData("transfer", [
-              owner.address,
+              identityProxyOwner1.address,
               1,
             ])
           )
@@ -277,69 +303,76 @@ describe("Identity", () => {
       });
 
       it("success", async () => {
-        await utils.executeContract(
-          testERC20.transfer(identityProxy1.address, totalSupply)
+        await utils.waitTx(
+          testERC20.transfer(await identityProxy1.getAddress(), totalSupply)
         );
 
-        expect(await testERC20.balanceOf(owner.address)).to.equal(0);
-        expect(await testERC20.balanceOf(identityProxy1.address)).to.equal(
-          totalSupply
-        );
+        expect(
+          await testERC20.balanceOf(await identityProxy1.getAddress())
+        ).to.equal(totalSupply);
 
         const data = testERC20.interface.encodeFunctionData("transfer", [
-          owner.address,
+          identityProxyOwner1.address,
           totalSupply,
         ]);
 
         await expect(
           testModule1.execute(
-            identityProxy1.address,
-            testERC20.address,
+            await identityProxy1.getAddress(),
+            await testERC20.getAddress(),
             0,
             data
           )
         )
           .to.emit(identityProxy1, "Executed")
-          .withArgs(testModule1.address, testERC20.address, 0, data);
+          .withArgs(
+            await testModule1.getAddress(),
+            await testERC20.getAddress(),
+            0,
+            data
+          );
 
-        expect(await testERC20.balanceOf(owner.address)).to.equal(totalSupply);
-        expect(await testERC20.balanceOf(identityProxy1.address)).to.equal(0);
+        expect(await testERC20.balanceOf(identityProxyOwner1.address)).to.equal(
+          totalSupply
+        );
+        expect(
+          await testERC20.balanceOf(await identityProxy1.getAddress())
+        ).to.equal(0);
       });
     });
   });
 
   describe("fallback", () => {
-    beforeEach(async () => {
-      identityProxy1 = await ethers.getContractAt(
-        "TestModule",
-        identityProxy1.address
-      );
-    });
-
     it("success", async () => {
+      const identityProxy1AsTestModule: TestModule = await ethers.getContractAt(
+        "TestModule",
+        await identityProxy1.getAddress()
+      );
+
       expect(
-        await identityProxy1.supportsInterface(constants.INTERFACE_ID_ERC165)
+        await identityProxy1AsTestModule.supportsInterface(
+          constants.INTERFACE_ID_ERC165
+        )
       ).to.be.true;
     });
   });
 
   describe("receive", () => {
     it("success", async () => {
-      expect(await ethers.provider.getBalance(identityProxy1.address)).to.equal(
-        0
-      );
+      expect(
+        await ethers.provider.getBalance(await identityProxy1.getAddress())
+      ).to.equal(0);
 
-      {
-        const tx = await owner.sendTransaction({
-          to: identityProxy1.address,
+      await utils.waitTx(
+        identityProxyOwner1.sendTransaction({
+          to: await identityProxy1.getAddress(),
           value: 1,
-        });
-        await tx.wait();
-      }
-
-      expect(await ethers.provider.getBalance(identityProxy1.address)).to.equal(
-        1
+        })
       );
+
+      expect(
+        await ethers.provider.getBalance(await identityProxy1.getAddress())
+      ).to.equal(1);
     });
   });
 });

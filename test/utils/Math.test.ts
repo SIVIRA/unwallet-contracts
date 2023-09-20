@@ -1,16 +1,23 @@
 import { expect } from "chai";
+import { ethers } from "hardhat";
 
-import { Contract } from "ethers";
+import { TestLib } from "../../typechain-types";
 
 import * as utils from "../utils";
 
 describe("Math", () => {
-  const deployer = new utils.Deployer();
+  let deployer: utils.Deployer;
 
-  let testLib: Contract;
+  let testLib: TestLib;
+
+  before(async () => {
+    const [runner] = await ethers.getSigners();
+
+    deployer = new utils.Deployer(runner);
+  });
 
   beforeEach(async () => {
-    testLib = await deployer.deployContract("TestLib");
+    testLib = await deployer.deploy("TestLib");
   });
 
   describe("min", () => {

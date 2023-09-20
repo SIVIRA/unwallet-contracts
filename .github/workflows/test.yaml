@@ -8,20 +8,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 16
-          cache: npm
+          node-version: 18
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
       - name: Cache dependencies
         id: cache
         uses: actions/cache@v3
         with:
           path: node_modules
-          key: ${{ hashFiles('package-lock.json') }}
+          key: ${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install
       - name: Test
-        run: npm run test
+        run: pnpm test

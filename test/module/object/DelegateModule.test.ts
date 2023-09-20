@@ -1,61 +1,74 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-import { Contract } from "ethers";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import {
+  DelegateModule,
+  Identity,
+  IdentityProxyFactory,
+  ModuleManager,
+  ModuleRegistry,
+  TestModule,
+} from "../../../typechain-types";
 
 import * as constants from "../../constants";
 import * as utils from "../../utils";
 
 describe("DelegateModule", () => {
-  const deployer = new utils.Deployer();
+  let deployer: utils.Deployer;
 
-  let owner: SignerWithAddress;
-  let other: SignerWithAddress;
+  let identityProxyOwner: HardhatEthersSigner;
+  let other: HardhatEthersSigner;
 
-  let identityProxyFactory: Contract;
-  let moduleRegistry: Contract;
-  let moduleManager: Contract;
+  let identityProxyFactory: IdentityProxyFactory;
+  let identity: Identity;
 
-  let module: Contract;
-  let testModule: Contract;
+  let moduleRegistry: ModuleRegistry;
+  let moduleManager: ModuleManager;
 
-  let identity: Contract;
-  let identityProxy: Contract;
-  let moduleManagerProxy: Contract;
+  let delegateModule: DelegateModule;
+  let testModule: TestModule;
+
+  let identityProxy: Identity;
+  let identityProxyAsDelegateModule: DelegateModule;
+  let moduleManagerProxy: ModuleManager;
 
   before(async () => {
-    [owner, other] = await ethers.getSigners();
+    let runner;
+    [runner, identityProxyOwner, other] = await ethers.getSigners();
+
+    deployer = new utils.Deployer(runner);
   });
 
   beforeEach(async () => {
-    moduleRegistry = await deployer.deployModuleRegistry();
-    moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
-    identity = await deployer.deployIdentity();
-    identityProxyFactory = await deployer.deployIdentityProxyFactory();
+    identityProxyFactory = await deployer.deploy("IdentityProxyFactory");
+    deployer.setIdentityProxyFactory(identityProxyFactory);
 
-    const moduleDeployer = new utils.ModuleDeployer(moduleRegistry);
+    identity = await deployer.deploy("Identity");
 
-    module = await moduleDeployer.deployModule("DelegateModule", [], true);
-    testModule = await moduleDeployer.deployModule("TestModule", [], true);
+    moduleRegistry = await deployer.deploy("ModuleRegistry");
+    deployer.setModuleRegistry(moduleRegistry);
 
-    const identityProxyDeployer = new utils.IdentityProxyDeployer(
-      identityProxyFactory
-    );
+    moduleManager = await deployer.deploy("ModuleManager", [
+      await moduleRegistry.getAddress(),
+    ]);
 
-    identityProxy = await identityProxyDeployer.deployProxy(
-      identity.address,
-      ethers.utils.randomBytes(32),
+    delegateModule = await deployer.deployModule("DelegateModule", [], true);
+    testModule = await deployer.deployModule("TestModule", [], true);
+
+    identityProxy = await deployer.deployIdentityProxy(
+      await identity.getAddress(),
+      utils.randomUint256(),
       identity.interface.encodeFunctionData("initialize", [
-        owner.address,
-        moduleManager.address,
-        [module.address, testModule.address],
+        identityProxyOwner.address,
+        await moduleManager.getAddress(),
+        [await delegateModule.getAddress(), await testModule.getAddress()],
         [
-          module.address,
-          module.address,
-          module.address,
-          module.address,
-          module.address,
+          await delegateModule.getAddress(),
+          await delegateModule.getAddress(),
+          await delegateModule.getAddress(),
+          await delegateModule.getAddress(),
+          await delegateModule.getAddress(),
         ],
         [
           constants.METHOD_ID_ERC165_SUPPORTS_INTERFACE,
@@ -72,43 +85,50 @@ describe("DelegateModule", () => {
       await identityProxy.moduleManager()
     );
 
-    identityProxy = await ethers.getContractAt(
+    identityProxyAsDelegateModule = await ethers.getContractAt(
       "DelegateModule",
-      identityProxy.address
+      await identityProxy.getAddress()
     );
   });
 
   describe("supportsInterface", () => {
     it("success", async () => {
       expect(
-        await identityProxy.supportsInterface(constants.INTERFACE_ID_ERC165)
+        await identityProxyAsDelegateModule.supportsInterface(
+          constants.INTERFACE_ID_ERC165
+        )
       ).to.be.true;
       expect(
-        await identityProxy.supportsInterface(
+        await identityProxyAsDelegateModule.supportsInterface(
           constants.INTERFACE_ID_ERC721_RECEIVER
         )
       ).to.be.true;
       expect(
-        await identityProxy.supportsInterface(
+        await identityProxyAsDelegateModule.supportsInterface(
           constants.INTERFACE_ID_ERC1155_RECEIVER
         )
       ).to.be.true;
       expect(
-        await identityProxy.supportsInterface(constants.INTERFACE_ID_ERC1271)
+        await identityProxyAsDelegateModule.supportsInterface(
+          constants.INTERFACE_ID_ERC1271
+        )
       ).to.be.true;
-      expect(await identityProxy.supportsInterface(constants.INTERFACE_ID_ZERO))
-        .to.be.false;
+      expect(
+        await identityProxyAsDelegateModule.supportsInterface(
+          constants.INTERFACE_ID_ZERO
+        )
+      ).to.be.false;
     });
   });
 
   describe("onERC721Received", () => {
     it("success", async () => {
       expect(
-        await identityProxy.onERC721Received(
-          ethers.constants.AddressZero,
-          ethers.constants.AddressZero,
+        await identityProxyAsDelegateModule.onERC721Received(
+          ethers.ZeroAddress,
+          ethers.ZeroAddress,
           0,
-          []
+          new Uint8Array()
         )
       ).to.equal(constants.METHOD_ID_ERC721_ON_ERC721_RECEIVED);
     });
@@ -117,12 +137,12 @@ describe("DelegateModule", () => {
   describe("onERC1155Received", () => {
     it("success", async () => {
       expect(
-        await identityProxy.onERC1155Received(
-          ethers.constants.AddressZero,
-          ethers.constants.AddressZero,
+        await identityProxyAsDelegateModule.onERC1155Received(
+          ethers.ZeroAddress,
+          ethers.ZeroAddress,
           0,
           0,
-          []
+          new Uint8Array()
         )
       ).to.equal(constants.METHOD_ID_ERC1155_ON_ERC1155_RECEIVED);
     });
@@ -131,12 +151,12 @@ describe("DelegateModule", () => {
   describe("onERC1155BatchReceived", () => {
     it("success", async () => {
       expect(
-        await identityProxy.onERC1155BatchReceived(
-          ethers.constants.AddressZero,
-          ethers.constants.AddressZero,
+        await identityProxyAsDelegateModule.onERC1155BatchReceived(
+          ethers.ZeroAddress,
+          ethers.ZeroAddress,
           [],
           [],
-          []
+          new Uint8Array()
         )
       ).to.equal(constants.METHOD_ID_ERC1155_ON_ERC1155_BATCH_RECEIVED);
     });
@@ -146,26 +166,35 @@ describe("DelegateModule", () => {
     let message: string;
     let digest: string;
 
-    beforeEach(() => {
+    before(() => {
       message = utils.randomString();
-      digest = ethers.utils.hashMessage(message);
+      digest = ethers.hashMessage(message);
     });
 
     it("failure: invalid signature length", async () => {
       await expect(
-        identityProxy.isValidSignature(digest, ethers.utils.randomBytes(64))
+        identityProxyAsDelegateModule.isValidSignature(
+          digest,
+          ethers.randomBytes(64)
+        )
       ).to.be.revertedWith("DM: invalid signature length");
     });
 
     it("failure: invalid signer", async () => {
       await expect(
-        identityProxy.isValidSignature(digest, other.signMessage(message))
+        identityProxyAsDelegateModule.isValidSignature(
+          digest,
+          await other.signMessage(message)
+        )
       ).to.be.revertedWith("DM: invalid signer");
     });
 
     it("success", async () => {
       expect(
-        await identityProxy.isValidSignature(digest, owner.signMessage(message))
+        await identityProxyAsDelegateModule.isValidSignature(
+          digest,
+          await identityProxyOwner.signMessage(message)
+        )
       ).to.equal(constants.METHOD_ID_ERC1271_IS_VALID_SIGNATURE);
     });
   });

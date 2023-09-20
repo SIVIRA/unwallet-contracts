@@ -1,39 +1,63 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-import { Contract } from "ethers";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import {
+  ModuleManager,
+  ModuleRegistry,
+  TestModule,
+} from "../../typechain-types";
 
 import * as utils from "../utils";
 
 describe("ModuleManager", () => {
-  const deployer = new utils.Deployer();
+  let deployer: utils.Deployer;
 
-  let owner: SignerWithAddress;
-  let other: SignerWithAddress;
+  let owner: HardhatEthersSigner;
+  let proxyOwner: HardhatEthersSigner;
+  let other: HardhatEthersSigner;
 
-  let moduleManager: Contract;
-  let moduleRegistry: Contract;
+  let moduleRegistry: ModuleRegistry;
+  let moduleManager: ModuleManager;
 
-  let testModule: Contract;
+  let testModule: TestModule;
+
+  let methodID: string;
 
   before(async () => {
-    [owner, other] = await ethers.getSigners();
+    [owner, proxyOwner, other] = await ethers.getSigners();
+
+    deployer = new utils.Deployer(owner);
+
+    methodID = utils.randomMethodID();
   });
 
   beforeEach(async () => {
-    moduleRegistry = await deployer.deployModuleRegistry();
-    moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
+    moduleRegistry = await deployer.deploy("ModuleRegistry");
+    deployer.setModuleRegistry(moduleRegistry);
 
-    const moduleDeployer = new utils.ModuleDeployer(moduleRegistry);
+    moduleManager = await deployer.deploy("ModuleManager", [
+      await moduleRegistry.getAddress(),
+    ]);
 
-    testModule = await moduleDeployer.deployModule("TestModule", [], true);
+    testModule = await deployer.deployModule("TestModule", [], true);
+  });
+
+  describe("initial state", () => {
+    it("success", async () => {
+      expect(await moduleManager.owner()).to.equal(await owner.getAddress());
+      expect(await moduleManager.isModuleEnabled(await testModule.getAddress()))
+        .to.be.false;
+      expect(await moduleManager.getDelegate(methodID)).to.equal(
+        ethers.ZeroAddress
+      );
+    });
   });
 
   describe("constructor", () => {
     it("failure: registry must be an existing contract address", async () => {
       await expect(
-        deployer.deployModuleManager(utils.randomAddress())
+        deployer.deploy("ModuleManager", [utils.randomAddress()])
       ).to.be.revertedWith("MM: registry must be an existing contract address");
     });
   });
@@ -46,17 +70,15 @@ describe("ModuleManager", () => {
     });
 
     it("success -> failure: contract is already initialized", async () => {
-      let moduleManagerProxy = await deployer.deployContract("Proxy", [
-        moduleManager.address,
-      ]);
-      moduleManagerProxy = await ethers.getContractAt(
-        "ModuleManager",
-        moduleManagerProxy.address
+      const moduleManagerProxy: ModuleManager = await deployer.deploy(
+        "Proxy",
+        [await moduleManager.getAddress()],
+        "ModuleManager"
       );
 
-      await moduleManagerProxy.initialize(owner.address);
+      await moduleManagerProxy.initialize(proxyOwner.address);
 
-      expect(await moduleManagerProxy.owner()).to.equal(owner.address);
+      expect(await moduleManagerProxy.owner()).to.equal(proxyOwner.address);
 
       await expect(
         moduleManagerProxy.initialize(other.address)
@@ -67,7 +89,7 @@ describe("ModuleManager", () => {
   describe("enableModule", () => {
     it("failure: caller must be the owner", async () => {
       await expect(
-        moduleManager.connect(other).enableModule(testModule.address)
+        moduleManager.connect(other).enableModule(await testModule.getAddress())
       ).to.be.revertedWith("O: caller must be the owner");
     });
 
@@ -78,107 +100,91 @@ describe("ModuleManager", () => {
     });
 
     it("success -> failure: module is already enabled", async () => {
-      expect(await moduleManager.isModuleEnabled(testModule.address)).to.be
-        .false;
-
-      await expect(moduleManager.enableModule(testModule.address))
+      await expect(moduleManager.enableModule(await testModule.getAddress()))
         .to.emit(moduleManager, "ModuleEnabled")
-        .withArgs(testModule.address);
+        .withArgs(await testModule.getAddress());
 
-      expect(await moduleManager.isModuleEnabled(testModule.address)).to.be
-        .true;
+      expect(await moduleManager.isModuleEnabled(await testModule.getAddress()))
+        .to.be.true;
 
       await expect(
-        moduleManager.enableModule(testModule.address)
+        moduleManager.enableModule(await testModule.getAddress())
       ).to.be.revertedWith("MM: module is already enabled");
     });
   });
 
   describe("disableModule", () => {
     beforeEach(async () => {
-      await utils.executeContract(
-        moduleManager.enableModule(testModule.address)
+      await utils.waitTx(
+        moduleManager.enableModule(await testModule.getAddress())
       );
-    });
-
-    it("failure: caller must be the owner", async () => {
-      await expect(
-        moduleManager.connect(other).disableModule(testModule.address)
-      ).to.be.revertedWith("O: caller must be the owner");
-    });
-
-    it("success -> failure: module is already disabled", async () => {
-      expect(await moduleManager.isModuleEnabled(testModule.address)).to.be
-        .true;
-
-      await expect(moduleManager.disableModule(testModule.address))
-        .to.emit(moduleManager, "ModuleDisabled")
-        .withArgs(testModule.address);
-
-      expect(await moduleManager.isModuleEnabled(testModule.address)).to.be
-        .false;
-
-      await expect(
-        moduleManager.disableModule(testModule.address)
-      ).to.be.revertedWith("MM: module is already disabled");
-    });
-  });
-
-  describe("enableDelegation", () => {
-    let methodID: string;
-
-    beforeEach(() => {
-      methodID = utils.randomMethodID();
     });
 
     it("failure: caller must be the owner", async () => {
       await expect(
         moduleManager
           .connect(other)
-          .enableDelegation(methodID, testModule.address)
+          .disableModule(await testModule.getAddress())
+      ).to.be.revertedWith("O: caller must be the owner");
+    });
+
+    it("success -> failure: module is already disabled", async () => {
+      await expect(moduleManager.disableModule(await testModule.getAddress()))
+        .to.emit(moduleManager, "ModuleDisabled")
+        .withArgs(await testModule.getAddress());
+
+      expect(await moduleManager.isModuleEnabled(await testModule.getAddress()))
+        .to.be.false;
+
+      await expect(
+        moduleManager.disableModule(await testModule.getAddress())
+      ).to.be.revertedWith("MM: module is already disabled");
+    });
+  });
+
+  describe("enableDelegation", () => {
+    it("failure: caller must be the owner", async () => {
+      await expect(
+        moduleManager
+          .connect(other)
+          .enableDelegation(methodID, await testModule.getAddress())
       ).to.be.revertedWith("O: caller must be the owner");
     });
 
     it("failure: module must be enabled", async () => {
       await expect(
-        moduleManager.enableDelegation(methodID, testModule.address)
+        moduleManager.enableDelegation(methodID, await testModule.getAddress())
       ).to.be.revertedWith("MM: module must be enabled");
     });
 
     it("success -> failure: delegation is already enabled", async () => {
-      await utils.executeContract(
-        moduleManager.enableModule(testModule.address)
-      );
-
-      expect(await moduleManager.getDelegate(methodID)).to.equal(
-        ethers.constants.AddressZero
-      );
-
-      await expect(moduleManager.enableDelegation(methodID, testModule.address))
-        .to.emit(moduleManager, "DelegationEnabled")
-        .withArgs(methodID, testModule.address);
-
-      expect(await moduleManager.getDelegate(methodID)).to.equal(
-        testModule.address
+      await utils.waitTx(
+        moduleManager.enableModule(await testModule.getAddress())
       );
 
       await expect(
-        moduleManager.enableDelegation(methodID, testModule.address)
+        moduleManager.enableDelegation(methodID, await testModule.getAddress())
+      )
+        .to.emit(moduleManager, "DelegationEnabled")
+        .withArgs(methodID, await testModule.getAddress());
+
+      expect(await moduleManager.getDelegate(methodID)).to.equal(
+        await testModule.getAddress()
+      );
+
+      await expect(
+        moduleManager.enableDelegation(methodID, await testModule.getAddress())
       ).to.be.revertedWith("MM: delegation is already enabled");
     });
   });
 
   describe("disableDelegation", () => {
-    let methodID: string;
-
     beforeEach(async () => {
-      methodID = utils.randomMethodID();
-
-      await utils.executeContract(
-        moduleManager.enableModule(testModule.address)
+      await utils.waitTx(
+        moduleManager.enableModule(await testModule.getAddress())
       );
-      await utils.executeContract(
-        moduleManager.enableDelegation(methodID, testModule.address)
+      await utils.waitTx(
+        moduleManager.enableDelegation(methodID, await testModule.getAddress())
       );
     });
 
@@ -189,16 +195,12 @@ describe("ModuleManager", () => {
     });
 
     it("success -> failure: delegation is already disabled", async () => {
-      expect(await moduleManager.getDelegate(methodID)).to.equal(
-        testModule.address
-      );
-
       await expect(moduleManager.disableDelegation(methodID))
         .to.emit(moduleManager, "DelegationDisabled")
         .withArgs(methodID);
 
       expect(await moduleManager.getDelegate(methodID)).to.equal(
-        ethers.constants.AddressZero
+        ethers.ZeroAddress
       );
 
       await expect(

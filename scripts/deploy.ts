@@ -1,212 +1,181 @@
 import { ethers } from "hardhat";
 
-import { Contract } from "ethers";
+import {
+  ArbRelayerModule,
+  DelegateModule,
+  Identity,
+  IdentityProxyFactory,
+  LockManager,
+  ModuleManager,
+  ModuleRegistry,
+  RelayerModule,
+} from "../typechain-types";
 
-import * as utils from "./utils";
+import { initDeployer, isContractDeployed } from "./utils";
 
-const FACTORY_ADDRESS = "0x0419677ca62aD4818Ceb005171376AE68d0B2f1F";
-const SALT =
-  "0x0000000000000000000000000000000000000000000000000000000000000000";
+const SALT = ethers.ZeroHash;
 
-const LOCK_PERIOD = 60 * 60 * 24 * 7;
+const LOCK_PERIOD = 60 * 60 * 24 * 7; // 1 week
 
 // should be adjusted according to the network
-const MIN_GAS = 21_000;
-const REFUND_GAS = 22_000;
+const RELAY_MIN_GAS = 21_000;
+const RELAY_REFUND_GAS = 22_000;
 
 (async () => {
-  const [owner] = await ethers.getSigners();
-
   const network = await ethers.provider.getNetwork();
 
-  const deployer = await (async (): Promise<utils.Deployer> => {
-    switch (network.chainId) {
-      case 31337:
-        const factoryFactory = await ethers.getContractFactory("Factory");
-        const factory = await factoryFactory.deploy();
-        await factory.deployed();
-        return new utils.Deployer(factory);
+  const [runner] = await ethers.getSigners();
+  const deployer = await initDeployer(runner);
+  const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 
-      default:
-        return new utils.Deployer(
-          await ethers.getContractAt("Factory", FACTORY_ADDRESS)
-        );
-    }
-  })();
-
-  let identityProxyFactory: Contract;
+  let identityProxyFactory: IdentityProxyFactory;
   {
     const name = "IdentityProxyFactory";
 
-    console.log(`[${name}]`);
-
     const factory = await ethers.getContractFactory(name);
 
     const code = factory.bytecode;
-    const expectedAddress = deployer.expectAddress(code, SALT);
+    const address = await deployer.getCreate2Address(code, SALT);
 
-    if (await utils.isContractDeployed(expectedAddress)) {
-      console.log(`skip (already deployed at ${expectedAddress})`);
+    if (await isContractDeployed(address)) {
+      console.log(`[${name}] skip (already deployed at ${address})`);
     } else {
-      console.log(`deploying...`);
-      await deployer.deployAndInitializeOwnership(code, SALT, owner.address);
-      console.log(`deployed to ${expectedAddress}`);
+      console.log(`[${name}] deploying...`);
+      await deployer.deployOwnable(code, SALT);
+      console.log(`[${name}] deployed at ${address}`);
     }
 
-    identityProxyFactory = factory.attach(expectedAddress);
+    identityProxyFactory = await ethers.getContractAt(name, address);
 
-    console.log(`owner: ${await identityProxyFactory.owner()}`);
+    console.log(`[${name}] owner: ${await identityProxyFactory.owner()}`);
   }
 
-  console.log();
-
-  let moduleRegistry: Contract;
+  let moduleRegistry: ModuleRegistry;
   {
     const name = "ModuleRegistry";
 
-    console.log(`[${name}]`);
-
     const factory = await ethers.getContractFactory(name);
 
     const code = factory.bytecode;
-    const expectedAddress = deployer.expectAddress(code, SALT);
+    const address = await deployer.getCreate2Address(code, SALT);
 
-    if (await utils.isContractDeployed(expectedAddress)) {
-      console.log(`skip (already deployed at ${expectedAddress})`);
+    if (await isContractDeployed(address)) {
+      console.log(`[${name}] skip (already deployed at ${address})`);
     } else {
-      console.log(`deploying...`);
-      await deployer.deployAndInitializeOwnership(code, SALT, owner.address);
-      console.log(`deployed to ${expectedAddress}`);
+      console.log(`[${name}] deploying...`);
+      await deployer.deployOwnable(code, SALT);
+      console.log(`[${name}] deployed at ${address}`);
     }
 
-    moduleRegistry = factory.attach(expectedAddress);
+    moduleRegistry = await ethers.getContractAt(name, address);
 
-    console.log(`owner: ${await moduleRegistry.owner()}`);
+    console.log(`[${name}] owner: ${await moduleRegistry.owner()}`);
   }
 
-  console.log();
-
-  let moduleManager: Contract;
+  let moduleManager: ModuleManager;
   {
     const name = "ModuleManager";
 
-    console.log(`[${name}]`);
-
     const factory = await ethers.getContractFactory(name);
 
-    const code = ethers.utils.concat([
+    const code = ethers.concat([
       factory.bytecode,
-      ethers.utils.defaultAbiCoder.encode(
-        ["address"],
-        [moduleRegistry.address]
-      ),
+      abiCoder.encode(["address"], [await moduleRegistry.getAddress()]),
     ]);
-    const expectedAddress = deployer.expectAddress(code, SALT);
+    const address = await deployer.getCreate2Address(code, SALT);
 
-    if (await utils.isContractDeployed(expectedAddress)) {
-      console.log(`skip (already deployed at ${expectedAddress})`);
+    if (await isContractDeployed(address)) {
+      console.log(`[${name}] skip (already deployed at ${address})`);
     } else {
-      console.log(`deploying...`);
-      await deployer.deployAndInitializeOwnership(code, SALT, owner.address);
-      console.log(`deployed to ${expectedAddress}`);
+      console.log(`[${name}] deploying...`);
+      await deployer.deployOwnable(code, SALT);
+      console.log(`[${name}] deployed at ${address}`);
     }
 
-    moduleManager = factory.attach(expectedAddress);
+    moduleManager = await ethers.getContractAt(name, address);
 
-    console.log(`owner: ${await moduleManager.owner()}`);
+    console.log(`[${name}] owner: ${await moduleManager.owner()}`);
   }
 
-  console.log();
-
-  let lockManager: Contract;
+  let lockManager: LockManager;
   {
     const name = "LockManager";
 
-    console.log(`[${name}]`);
-
     const factory = await ethers.getContractFactory(name);
 
-    const code = ethers.utils.concat([
+    const code = ethers.concat([
       factory.bytecode,
-      ethers.utils.defaultAbiCoder.encode(["uint256"], [LOCK_PERIOD]),
+      abiCoder.encode(["uint256"], [LOCK_PERIOD]),
     ]);
-    const expectedAddress = deployer.expectAddress(code, SALT);
+    const address = await deployer.getCreate2Address(code, SALT);
 
-    if (await utils.isContractDeployed(expectedAddress)) {
-      console.log(`skip (already deployed at ${expectedAddress})`);
+    if (await isContractDeployed(address)) {
+      console.log(`[${name}] skip (already deployed at ${address})`);
     } else {
-      console.log(`deploying...`);
+      console.log(`[${name}] deploying...`);
       await deployer.deploy(code, SALT);
-      console.log(`deployed to ${expectedAddress}`);
+      console.log(`[${name}] deployed at ${address}`);
     }
 
-    lockManager = factory.attach(expectedAddress);
+    lockManager = await ethers.getContractAt(name, address);
   }
 
-  console.log();
-
-  let identity: Contract;
+  let identity: Identity;
   {
     const name = "Identity";
-
-    console.log(`[${name}]`);
 
     const factory = await ethers.getContractFactory(name);
 
     const code = factory.bytecode;
-    const expectedAddress = deployer.expectAddress(code, SALT);
+    const address = await deployer.getCreate2Address(code, SALT);
 
-    if (await utils.isContractDeployed(expectedAddress)) {
-      console.log(`skip (already deployed at ${expectedAddress})`);
+    if (await isContractDeployed(address)) {
+      console.log(`[${name}] skip (already deployed at ${address})`);
     } else {
-      console.log(`deploying...`);
+      console.log(`[${name}] deploying...`);
       await deployer.deploy(
         code,
         SALT,
         factory.interface.encodeFunctionData("initialize", [
-          owner.address,
-          moduleManager.address,
+          runner.address,
+          await moduleManager.getAddress(),
           [],
           [],
           [],
         ])
       );
-      console.log(`deployed to ${expectedAddress}`);
+      console.log(`[${name}] deployed at ${address}`);
     }
 
-    identity = factory.attach(expectedAddress);
+    identity = await ethers.getContractAt(name, address);
 
-    console.log(`owner: ${await identity.owner()}`);
-    console.log(`moduleManager: ${await identity.moduleManager()}`);
+    console.log(`[${name}] owner: ${await identity.owner()}`);
+    console.log(`[${name}] moduleManager: ${await identity.moduleManager()}`);
   }
 
-  console.log();
-
-  let relayerModule: Contract;
+  let relayerModule: RelayerModule | ArbRelayerModule;
   switch (network.chainId) {
-    case 42161:
-    case 421613: {
+    case BigInt(42161):
+    case BigInt(421613): {
       const name = "ArbRelayerModule";
-
-      console.log(`[${name}]`);
 
       const factory = await ethers.getContractFactory(name);
 
-      const code = ethers.utils.concat([
+      const code = ethers.concat([
         factory.bytecode,
-        ethers.utils.defaultAbiCoder.encode(["address"], [lockManager.address]),
+        abiCoder.encode(["address"], [await lockManager.getAddress()]),
       ]);
-      const expectedAddress = deployer.expectAddress(code, SALT);
+      const address = await deployer.getCreate2Address(code, SALT);
 
-      if (await utils.isContractDeployed(expectedAddress)) {
-        console.log(`skip (already deployed at ${expectedAddress})`);
+      if (await isContractDeployed(address)) {
+        console.log(`[${name}] skip (already deployed at ${address})`);
       } else {
-        console.log(`deploying...`);
+        console.log(`[${name}] deploying...`);
         await deployer.deploy(code, SALT);
-        console.log(`deployed to ${expectedAddress}`);
+        console.log(`[${name}] deployed at ${address}`);
       }
 
-      relayerModule = factory.attach(expectedAddress);
+      relayerModule = await ethers.getContractAt(name, address);
 
       break;
     }
@@ -214,53 +183,47 @@ const REFUND_GAS = 22_000;
     default: {
       const name = "RelayerModule";
 
-      console.log(`[${name}]`);
-
       const factory = await ethers.getContractFactory(name);
 
-      const code = ethers.utils.concat([
+      const code = ethers.concat([
         factory.bytecode,
-        ethers.utils.defaultAbiCoder.encode(
+        abiCoder.encode(
           ["address", "uint256", "uint256"],
-          [lockManager.address, MIN_GAS, REFUND_GAS]
+          [await lockManager.getAddress(), RELAY_MIN_GAS, RELAY_REFUND_GAS]
         ),
       ]);
-      const expectedAddress = deployer.expectAddress(code, SALT);
+      const address = await deployer.getCreate2Address(code, SALT);
 
-      if (await utils.isContractDeployed(expectedAddress)) {
-        console.log(`skip (already deployed at ${expectedAddress})`);
+      if (await isContractDeployed(address)) {
+        console.log(`[${name}] skip (already deployed at ${address})`);
       } else {
-        console.log(`deploying...`);
+        console.log(`[${name}] deploying...`);
         await deployer.deploy(code, SALT);
-        console.log(`deployed to ${expectedAddress}`);
+        console.log(`[${name}] deployed at ${address}`);
       }
 
-      relayerModule = factory.attach(expectedAddress);
+      relayerModule = await ethers.getContractAt(name, address);
     }
   }
 
-  console.log();
-
-  let delegateModule: Contract;
+  let delegateModule: DelegateModule;
   {
     const name = "DelegateModule";
-
-    console.log(`[${name}]`);
 
     const factory = await ethers.getContractFactory(name);
 
     const code = factory.bytecode;
-    const expectedAddress = deployer.expectAddress(code, SALT);
+    const address = await deployer.getCreate2Address(code, SALT);
 
-    if (await utils.isContractDeployed(expectedAddress)) {
-      console.log(`skip (already deployed at ${expectedAddress})`);
+    if (await isContractDeployed(address)) {
+      console.log(`[${name}] skip (already deployed at ${address})`);
     } else {
-      console.log(`deploying...`);
+      console.log(`[${name}] deploying...`);
       await deployer.deploy(code, SALT);
-      console.log(`deployed to ${expectedAddress}`);
+      console.log(`[${name}] deployed at ${address}`);
     }
 
-    delegateModule = factory.attach(expectedAddress);
+    delegateModule = await ethers.getContractAt(name, address);
   }
 })()
   .then(() => process.exit(0))
