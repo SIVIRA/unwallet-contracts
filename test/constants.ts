@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 
-const UINT64_MAX = ethers.BigNumber.from("0xffffffffffffffff");
-const UINT128_MAX = ethers.BigNumber.from("0xffffffffffffffffffffffffffffffff");
+const UINT64_MAX = ethers.toBigInt("0xffffffffffffffff");
+const UINT128_MAX = ethers.toBigInt("0xffffffffffffffffffffffffffffffff");
 
 const INTERFACE_ID_ERC165 = "0x01ffc9a7";
 const INTERFACE_ID_ERC721_RECEIVER = "0x150b7a02";
@@ -18,19 +18,10 @@ const METHOD_ID_ERC1155_ON_ERC1155_BATCH_RECEIVED = "0xbc197c81"; // bytes4(kecc
 const METHOD_ID_ERC1271_IS_VALID_SIGNATURE = "0x1626ba7e"; // bytes4(keccak256("isValidSignature(bytes32,bytes)")
 const METHOD_ID_ZERO = "0x00000000";
 
-const LOCK_PERIOD = 604800;
+const LOCK_PERIOD = 60 * 60 * 24 * 7; // 1 week
 
-const EMPTY_EXECUTION_GAS_CONFIG = {
-  price: 0,
-  limit: 0,
-  token: ethers.constants.AddressZero,
-  refundTo: ethers.constants.AddressZero,
-};
-
-const EMPTY_EXECUTION_RESULT = {
-  types: [] as string[],
-  values: [] as any[],
-};
+const RELAY_MIN_GAS = BigInt(21_000);
+const RELAY_REFUND_GAS = BigInt(22_000);
 
 export {
   UINT64_MAX,
@@ -49,6 +40,6 @@ export {
   METHOD_ID_ERC1271_IS_VALID_SIGNATURE,
   METHOD_ID_ZERO,
   LOCK_PERIOD,
-  EMPTY_EXECUTION_GAS_CONFIG,
-  EMPTY_EXECUTION_RESULT,
+  RELAY_MIN_GAS,
+  RELAY_REFUND_GAS,
 };

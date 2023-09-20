@@ -1,45 +1,68 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-import { Contract } from "ethers";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import {
+  Identity,
+  IdentityProxyFactory,
+  ModuleManager,
+  ModuleRegistry,
+  Proxy,
+} from "../../typechain-types";
 
 import * as utils from "../utils";
 
 describe("IdentityProxyFactory", () => {
-  const deployer = new utils.Deployer();
+  let deployer: utils.Deployer;
 
-  let owner: SignerWithAddress;
-  let other: SignerWithAddress;
+  let owner: HardhatEthersSigner;
+  let identityProxyOwner: HardhatEthersSigner;
+  let other: HardhatEthersSigner;
 
-  let identityProxyFactory: Contract;
-  let moduleRegistry: Contract;
-  let moduleManager: Contract;
+  let identityProxyFactory: IdentityProxyFactory;
+  let identity: Identity;
 
-  let identity: Contract;
+  let moduleRegistry: ModuleRegistry;
+  let moduleManager: ModuleManager;
 
   before(async () => {
-    [owner, other] = await ethers.getSigners();
+    [owner, identityProxyOwner, other] = await ethers.getSigners();
+
+    deployer = new utils.Deployer(owner);
   });
 
   beforeEach(async () => {
-    moduleRegistry = await deployer.deployModuleRegistry();
-    moduleManager = await deployer.deployModuleManager(moduleRegistry.address);
-    identity = await deployer.deployIdentity();
-    identityProxyFactory = await deployer.deployIdentityProxyFactory();
+    identityProxyFactory = await deployer.deploy("IdentityProxyFactory");
+    identity = await deployer.deploy("Identity");
+
+    moduleRegistry = await deployer.deploy("ModuleRegistry");
+    moduleManager = await deployer.deploy("ModuleManager", [
+      await moduleRegistry.getAddress(),
+    ]);
+  });
+
+  describe("initial state", () => {
+    it("success", async () => {
+      expect(await identityProxyFactory.owner()).to.equal(
+        await owner.getAddress()
+      );
+    });
   });
 
   describe("getProxyAddress", () => {
     it("success", async () => {
-      const salt = ethers.utils.randomBytes(32);
+      const salt = utils.randomUint256();
 
       expect(
-        await identityProxyFactory.getProxyAddress(identity.address, salt)
+        await identityProxyFactory.getProxyAddress(
+          await identity.getAddress(),
+          ethers.toBeHex(salt, 32)
+        )
       ).to.equal(
-        await utils.expectProxyAddress(
-          identityProxyFactory.address,
+        await utils.getProxyCreate2Address(
+          await identityProxyFactory.getAddress(),
           salt,
-          identity.address
+          await identity.getAddress()
         )
       );
     });
@@ -51,11 +74,11 @@ describe("IdentityProxyFactory", () => {
         identityProxyFactory
           .connect(other)
           .createProxy(
-            identity.address,
-            ethers.utils.randomBytes(32),
+            await identity.getAddress(),
+            ethers.randomBytes(32),
             identity.interface.encodeFunctionData("initialize", [
               other.address,
-              moduleManager.address,
+              await moduleManager.getAddress(),
               [],
               [],
               [],
@@ -65,21 +88,21 @@ describe("IdentityProxyFactory", () => {
     });
 
     it("success", async () => {
-      const salt = ethers.utils.randomBytes(32);
+      const salt = utils.randomUint256();
 
-      const expectedProxyAddress = await utils.expectProxyAddress(
-        identityProxyFactory.address,
+      const expectedIdentityProxyAddress = await utils.getProxyCreate2Address(
+        await identityProxyFactory.getAddress(),
         salt,
-        identity.address
+        await identity.getAddress()
       );
 
       await expect(
         identityProxyFactory.createProxy(
-          identity.address,
-          salt,
+          await identity.getAddress(),
+          ethers.toBeHex(salt, 32),
           identity.interface.encodeFunctionData("initialize", [
-            owner.address,
-            moduleManager.address,
+            identityProxyOwner.address,
+            await moduleManager.getAddress(),
             [],
             [],
             [],
@@ -87,14 +110,16 @@ describe("IdentityProxyFactory", () => {
         )
       )
         .to.emit(identityProxyFactory, "ProxyCreated")
-        .withArgs(expectedProxyAddress);
+        .withArgs(expectedIdentityProxyAddress);
 
-      const identityProxy = await ethers.getContractAt(
+      const identityProxyAsProxy: Proxy = await ethers.getContractAt(
         "Proxy",
-        expectedProxyAddress
+        expectedIdentityProxyAddress
       );
 
-      expect(await identityProxy.implementation()).to.equal(identity.address);
+      expect(await identityProxyAsProxy.implementation()).to.equal(
+        await identity.getAddress()
+      );
     });
   });
 });

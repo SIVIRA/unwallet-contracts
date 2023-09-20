@@ -1,25 +1,27 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-import { Contract } from "ethers";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { Ownable } from "../../../typechain-types";
 
 import * as utils from "../../utils";
 
 describe("Ownable", () => {
-  let ownable: Contract;
+  let deployer: utils.Deployer;
 
-  let owner: SignerWithAddress;
-  let other: SignerWithAddress;
+  let ownable: Ownable;
+
+  let owner: HardhatEthersSigner;
+  let other: HardhatEthersSigner;
 
   before(async () => {
     [owner, other] = await ethers.getSigners();
+
+    deployer = new utils.Deployer(owner);
   });
 
   beforeEach(async () => {
-    const deployer = new utils.Deployer();
-
-    ownable = await deployer.deployContract("Ownable");
+    ownable = await deployer.deploy("Ownable");
   });
 
   describe("initial state", () => {
@@ -36,13 +38,11 @@ describe("Ownable", () => {
     });
 
     it("success", async () => {
-      expect(await ownable.owner()).to.equal(owner.address);
-
       await expect(ownable.renounceOwnership())
         .to.emit(ownable, "OwnershipTransferred")
-        .withArgs(owner.address, ethers.constants.AddressZero);
+        .withArgs(owner.address, ethers.ZeroAddress);
 
-      expect(await ownable.owner()).to.equal(ethers.constants.AddressZero);
+      expect(await ownable.owner()).to.equal(ethers.ZeroAddress);
     });
   });
 
@@ -55,13 +55,11 @@ describe("Ownable", () => {
 
     it("failure: new owner must not be the zero address", async () => {
       await expect(
-        ownable.transferOwnership(ethers.constants.AddressZero)
+        ownable.transferOwnership(ethers.ZeroAddress)
       ).to.be.revertedWith("O: new owner must not be the zero address");
     });
 
     it("success", async () => {
-      expect(await ownable.owner()).to.equal(owner.address);
-
       await expect(ownable.transferOwnership(other.address))
         .to.emit(ownable, "OwnershipTransferred")
         .withArgs(owner.address, other.address);

@@ -1,22 +1,29 @@
 import { expect } from "chai";
+import { ethers } from "hardhat";
 
-import { Contract } from "ethers";
+import { TestLib } from "../../typechain-types";
 
 import * as utils from "../utils";
 
 describe("Address", () => {
-  const deployer = new utils.Deployer();
+  let deployer: utils.Deployer;
 
-  let testLib: Contract;
+  let testLib: TestLib;
+
+  before(async () => {
+    const [runner] = await ethers.getSigners();
+
+    deployer = new utils.Deployer(runner);
+  });
 
   beforeEach(async () => {
-    testLib = await deployer.deployContract("TestLib");
+    testLib = await deployer.deploy("TestLib");
   });
 
   describe("isContract", () => {
     it("success", async () => {
       expect(await testLib.isContract(utils.randomAddress())).to.be.false;
-      expect(await testLib.isContract(testLib.address)).to.be.true;
+      expect(await testLib.isContract(await testLib.getAddress())).to.be.true;
     });
   });
 });

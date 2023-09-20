@@ -1,30 +1,37 @@
 import { expect } from "chai";
+import { ethers } from "hardhat";
 
-import { Contract } from "ethers";
+import { Proxy, TestDummy } from "../typechain-types";
 
 import * as utils from "./utils";
 
 describe("Proxy", () => {
-  const deployer = new utils.Deployer();
+  let deployer: utils.Deployer;
 
-  let dummy: Contract;
-  let proxy: Contract;
+  let dummy: TestDummy;
+  let proxy: Proxy;
+
+  before(async () => {
+    const [runner] = await ethers.getSigners();
+
+    deployer = new utils.Deployer(runner);
+  });
 
   beforeEach(async () => {
-    dummy = await deployer.deployContract("TestDummy");
-    proxy = await deployer.deployContract("Proxy", [dummy.address]);
+    dummy = await deployer.deploy("TestDummy");
+    proxy = await deployer.deploy("Proxy", [await dummy.getAddress()]);
   });
 
   describe("initial state", () => {
     it("success", async () => {
-      expect(await proxy.implementation()).to.equal(dummy.address);
+      expect(await proxy.implementation()).to.equal(await dummy.getAddress());
     });
   });
 
   describe("constructor", () => {
     it("failure: implementation: must be an existing contract address", async () => {
       await expect(
-        deployer.deployContract("Proxy", [utils.randomAddress()])
+        deployer.deploy("Proxy", [utils.randomAddress()])
       ).to.be.revertedWith(
         "P: implementation must be an existing contract address"
       );

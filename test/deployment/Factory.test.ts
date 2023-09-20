@@ -1,50 +1,53 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-import { Contract } from "ethers";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { BigNumberish, BytesLike } from "ethers";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { Factory, TestDummy } from "../../typechain-types";
 
 import * as utils from "../utils";
 
 describe("Factory", () => {
-  const deployer = new utils.Deployer();
+  let deployer: utils.Deployer;
 
-  let owner: SignerWithAddress;
+  let identityProxyFactoryOwner: HardhatEthersSigner;
 
-  let factory: Contract;
-  let dummy: Contract;
+  let factory: Factory;
+  let dummy: TestDummy;
 
   before(async () => {
-    [owner] = await ethers.getSigners();
+    let runner;
+    [runner, identityProxyFactoryOwner] = await ethers.getSigners();
+
+    deployer = new utils.Deployer(runner);
   });
 
   beforeEach(async () => {
-    factory = await deployer.deployFactory();
-    dummy = await deployer.deployContract("TestDummy");
+    factory = await deployer.deploy("Factory");
+    dummy = await deployer.deploy("TestDummy");
   });
 
   describe("create", () => {
-    let code: Uint8Array;
-    let salt: Uint8Array;
+    let code: BytesLike;
+    let salt: BigNumberish;
 
     let expectedAddress: string;
 
-    beforeEach(async () => {
-      code = ethers.utils.concat([
-        (await ethers.getContractFactory("IdentityProxyFactory")).bytecode,
-        ethers.utils.defaultAbiCoder.encode(["address"], [dummy.address]),
-      ]);
-      salt = ethers.utils.randomBytes(32);
+    before(async () => {
+      code = (await ethers.getContractFactory("IdentityProxyFactory")).bytecode;
+      salt = utils.randomUint256();
+    });
 
-      expectedAddress = ethers.utils.getCreate2Address(
-        factory.address,
-        salt,
-        ethers.utils.keccak256(code)
+    beforeEach(async () => {
+      expectedAddress = ethers.getCreate2Address(
+        await factory.getAddress(),
+        ethers.toBeHex(salt, 32),
+        ethers.keccak256(code)
       );
     });
 
     it("success: without initialization", async () => {
-      await expect(factory.create(code, salt, []))
+      await expect(factory.create(code, salt, new Uint8Array()))
         .to.emit(factory, "Created")
         .withArgs(expectedAddress);
 
@@ -53,7 +56,9 @@ describe("Factory", () => {
         expectedAddress
       );
 
-      expect(await identityProxyFactory.owner()).to.equal(factory.address);
+      expect(await identityProxyFactory.owner()).to.equal(
+        await factory.getAddress()
+      );
     });
 
     it("success: with initialization", async () => {
@@ -61,9 +66,11 @@ describe("Factory", () => {
         factory.create(
           code,
           salt,
-          (
-            await ethers.getContractFactory("Ownable")
-          ).interface.encodeFunctionData("transferOwnership", [owner.address])
+          new ethers.Interface([
+            "function transferOwnership(address)",
+          ]).encodeFunctionData("transferOwnership", [
+            identityProxyFactoryOwner.address,
+          ])
         )
       )
         .to.emit(factory, "Created")
@@ -74,7 +81,9 @@ describe("Factory", () => {
         expectedAddress
       );
 
-      expect(await identityProxyFactory.owner()).to.equal(owner.address);
+      expect(await identityProxyFactory.owner()).to.equal(
+        identityProxyFactoryOwner.address
+      );
     });
   });
 });

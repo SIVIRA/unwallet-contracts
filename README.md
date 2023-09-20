@@ -1,19 +1,21 @@
 # unWallet contracts
 
-[![test](https://github.com/SIVIRA/unwallet-contracts/actions/workflows/test.yml/badge.svg)](https://github.com/SIVIRA/unwallet-contracts/actions/workflows/test.yml)
+[![test](https://github.com/SIVIRA/unwallet-contracts/actions/workflows/test.yaml/badge.svg)](https://github.com/SIVIRA/unwallet-contracts/actions/workflows/test.yaml)
 
 unWallet is a contract wallet with upgradability based on its modular structure.
 
 ## for Developers
 
-### Install
+### Prerequisites
 
-```sh
-$ npm ci
+Requires [pnpm](https://pnpm.io) to be installed.
+
+```
+pnpm install
 ```
 
 ### Test
 
-```sh
-$ npm run test
+```
+pnpm test
 ```
