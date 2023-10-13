@@ -22,7 +22,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ${{ env.PNPM_STORE_PATH }}
-          key: pnpm-store-${{ hashFiles('onchain/pnpm-lock.yaml') }}
+          key: pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install dependencies
         run: pnpm install
       - name: Test
