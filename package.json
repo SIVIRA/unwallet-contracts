@@ -7,7 +7,9 @@
   },
   "scripts": {
     "build": "hardhat compile",
+    "clean": "rm -rf artifacts cache typechain-types",
     "commit": "cz",
+    "prepare": "husky",
     "test": "hardhat test"
   },
   "dependencies": {
