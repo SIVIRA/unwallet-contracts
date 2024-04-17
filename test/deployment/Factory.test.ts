@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { BigNumberish, BytesLike } from "ethers";
+import { BytesLike } from "ethers";
 import { Factory } from "../../typechain-types";
 
 import * as utils from "../utils";
@@ -27,7 +27,7 @@ describe("Factory", () => {
 
   describe("create", () => {
     let code: BytesLike;
-    let salt: BigNumberish;
+    let salt: bigint;
 
     let expectedAddress: string;
 
