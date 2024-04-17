@@ -9,10 +9,10 @@ import * as utils from "../../utils";
 describe("Ownable", () => {
   let deployer: utils.Deployer;
 
-  let ownable: Ownable;
-
   let owner: HardhatEthersSigner;
   let other: HardhatEthersSigner;
+
+  let ownable: Ownable;
 
   before(async () => {
     [owner, other] = await ethers.getSigners();

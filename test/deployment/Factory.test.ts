@@ -3,7 +3,7 @@ import { ethers } from "hardhat";
 
 import { BigNumberish, BytesLike } from "ethers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
-import { Factory, TestDummy } from "../../typechain-types";
+import { Factory } from "../../typechain-types";
 
 import * as utils from "../utils";
 
@@ -13,7 +13,6 @@ describe("Factory", () => {
   let identityProxyFactoryOwner: HardhatEthersSigner;
 
   let factory: Factory;
-  let dummy: TestDummy;
 
   before(async () => {
     let runner;
@@ -24,7 +23,6 @@ describe("Factory", () => {
 
   beforeEach(async () => {
     factory = await deployer.deploy("Factory");
-    dummy = await deployer.deploy("TestDummy");
   });
 
   describe("create", () => {
