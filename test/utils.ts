@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import {
   BigNumberish,
   Block,
@@ -8,7 +9,6 @@ import {
   TransactionReceipt,
   TransactionResponse,
 } from "ethers";
-import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import {
   ArbRelayerModule,
   IdentityProxyFactory,
