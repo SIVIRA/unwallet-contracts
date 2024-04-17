@@ -351,7 +351,7 @@ function randomString(length: number = 8): string {
   return s;
 }
 
-function randomUint256(): BigNumberish {
+function randomUint256(): bigint {
   return ethers.toBigInt(ethers.randomBytes(32));
 }
 
