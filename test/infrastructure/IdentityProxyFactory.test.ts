@@ -43,9 +43,7 @@ describe("IdentityProxyFactory", () => {
 
   describe("initial state", () => {
     it("success", async () => {
-      expect(await identityProxyFactory.owner()).to.equal(
-        await owner.getAddress()
-      );
+      expect(await identityProxyFactory.owner()).to.equal(owner.address);
     });
   });
 

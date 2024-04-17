@@ -45,7 +45,7 @@ describe("ModuleManager", () => {
 
   describe("initial state", () => {
     it("success", async () => {
-      expect(await moduleManager.owner()).to.equal(await owner.getAddress());
+      expect(await moduleManager.owner()).to.equal(owner.address);
       expect(await moduleManager.isModuleEnabled(await testModule.getAddress()))
         .to.be.false;
       expect(await moduleManager.getDelegate(methodID)).to.equal(

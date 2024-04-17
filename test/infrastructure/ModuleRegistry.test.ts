@@ -40,7 +40,7 @@ describe("ModuleRegistry", () => {
 
   describe("initial state", () => {
     it("success", async () => {
-      expect(await moduleRegistry.owner()).to.equal(await owner.getAddress());
+      expect(await moduleRegistry.owner()).to.equal(owner.address);
       expect(
         await moduleRegistry.isModuleRegistered(await testModule.getAddress())
       ).to.be.false;
