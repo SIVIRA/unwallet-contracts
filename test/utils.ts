@@ -302,9 +302,9 @@ class IdentityOpManager {
     );
   }
 
-  private _getIdentityOpResultBytes(result: IdentityOpResult): BytesLike {
+  private _getIdentityOpResultBytes(result: IdentityOpResult): string {
     if (result.types.length === 0) {
-      return new Uint8Array();
+      return "0x";
     }
 
     return ethers.AbiCoder.defaultAbiCoder().encode(
@@ -313,7 +313,7 @@ class IdentityOpManager {
     );
   }
 
-  private _getErrorResultBytes(message: string): BytesLike {
+  private _getErrorResultBytes(message: string): string {
     return ethers.concat([
       "0x08c379a0",
       ethers.AbiCoder.defaultAbiCoder().encode(["string"], [message]),
