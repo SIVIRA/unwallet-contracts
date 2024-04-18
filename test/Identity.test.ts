@@ -344,7 +344,7 @@ describe("Identity", () => {
 
   describe("fallback", () => {
     it("success", async () => {
-      const identityProxy1AsTestModule: TestModule = await ethers.getContractAt(
+      const identityProxy1AsTestModule = await ethers.getContractAt(
         "TestModule",
         await identityProxy1.getAddress()
       );
