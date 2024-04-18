@@ -156,7 +156,7 @@ class IdentityOpManager {
     data: BytesLike,
     config?: IdentityOpConfig
   ): Promise<{
-    identityOpHash: BytesLike;
+    identityOpHash: string;
     transact: Promise<TransactionResponse>;
   }> {
     config ??= {
@@ -182,7 +182,7 @@ class IdentityOpManager {
   }
 
   public async prepareTxToPing(config?: IdentityOpConfig): Promise<{
-    identityOpHash: BytesLike;
+    identityOpHash: string;
     transact: Promise<TransactionResponse>;
   }> {
     const data = this.relayerModule.interface.encodeFunctionData("ping");
@@ -194,7 +194,7 @@ class IdentityOpManager {
     args: [string, string, BigNumberish, BytesLike],
     config?: IdentityOpConfig
   ): Promise<{
-    identityOpHash: BytesLike;
+    identityOpHash: string;
     transact: Promise<TransactionResponse>;
   }> {
     const data = this.relayerModule.interface.encodeFunctionData(
@@ -206,7 +206,7 @@ class IdentityOpManager {
   }
 
   public async ping(config?: IdentityOpConfig): Promise<{
-    identityOpHash: BytesLike;
+    identityOpHash: string;
     txReceipt: TransactionReceipt;
   }> {
     const { identityOpHash, transact } = await this.prepareTxToPing(config);
@@ -221,7 +221,7 @@ class IdentityOpManager {
     args: [string, string, BigNumberish, BytesLike],
     config?: IdentityOpConfig
   ): Promise<{
-    identityOpHash: BytesLike;
+    identityOpHash: string;
     txReceipt: TransactionReceipt;
   }> {
     const { identityOpHash, transact } =
@@ -234,7 +234,7 @@ class IdentityOpManager {
   }
 
   public async expectIdentityOpSuccess(
-    identityOpHash: BytesLike,
+    identityOpHash: string,
     txReceipt: TransactionReceipt,
     result?: IdentityOpResult
   ): Promise<void> {
@@ -266,7 +266,7 @@ class IdentityOpManager {
   private async _getIdentityOpHash(
     data: BytesLike,
     config: IdentityOpConfig
-  ): Promise<BytesLike> {
+  ): Promise<string> {
     const relayerModuleAddress = await this.relayerModule.getAddress();
 
     const network = await ethers.provider.getNetwork();
