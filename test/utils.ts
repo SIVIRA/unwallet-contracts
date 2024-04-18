@@ -141,7 +141,7 @@ class IdentityOpManager {
     });
   }
 
-  public async sign(hash: BytesLike): Promise<BytesLike> {
+  public async sign(hash: BytesLike): Promise<string> {
     const message = ethers.getBytes(hash);
 
     let sig = await this.owner.signMessage(message);
