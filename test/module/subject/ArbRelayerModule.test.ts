@@ -146,6 +146,10 @@ describe("ArbRelayerModule", () => {
         const { identityOpHash, txReceipt } = await identityOpManager.ping(
           identityOpConfig
         );
+        await identityOpManager.expectIdentityOpSuccess(
+          identityOpHash,
+          txReceipt
+        );
 
         const relayerBalanceAfter = await ethers.provider.getBalance(
           relayer.address
@@ -155,10 +159,6 @@ describe("ArbRelayerModule", () => {
           relayerBalanceAfter -
           (relayerBalanceBefore - txReceipt.gasPrice * txReceipt.gasUsed);
 
-        await identityOpManager.expectIdentityOpSuccess(
-          identityOpHash,
-          txReceipt
-        );
         await expect(txReceipt.hash)
           .to.emit(arbRelayerModule, "Refunded")
           .withArgs(
