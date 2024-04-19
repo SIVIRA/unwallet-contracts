@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 
-import { BigNumberish, BytesLike } from "ethers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { BigNumberish, BytesLike } from "ethers";
 import { Factory } from "../typechain-types";
 
 const FACTORY_ADDRESS = "0x0419677ca62aD4818Ceb005171376AE68d0B2f1F";
