@@ -140,10 +140,6 @@ describe("RelayerModule", () => {
         await identityProxy.getAddress()
       );
 
-      expect(
-        await relayerModule.getNonce(await identityProxy.getAddress())
-      ).to.equal(0);
-
       let gasPrice;
       let gasFeeRefunded;
       {

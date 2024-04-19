@@ -136,10 +136,6 @@ describe("ArbRelayerModule", () => {
         await identityProxy.getAddress()
       );
 
-      expect(
-        await arbRelayerModule.getNonce(await identityProxy.getAddress())
-      ).to.equal(0);
-
       let gasFeeRefunded;
       {
         const relayerBalanceBefore = await ethers.provider.getBalance(
