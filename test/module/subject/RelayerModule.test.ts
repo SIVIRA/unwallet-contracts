@@ -142,6 +142,7 @@ describe("RelayerModule", () => {
 
       let gasPrice;
       let gasFeeRefunded;
+
       {
         const relayerBalanceBefore = await ethers.provider.getBalance(
           relayer.address
