@@ -15,7 +15,7 @@
     "@openzeppelin/contracts": "4.9.6"
   },
   "devDependencies": {
-    "@commitlint/cli": "19.2.2",
+    "@commitlint/cli": "19.3.0",
     "@commitlint/config-conventional": "19.2.2",
     "@nomicfoundation/hardhat-ethers": "3.0.5",
     "@nomicfoundation/hardhat-network-helpers": "1.0.10",
@@ -27,7 +27,7 @@
     "commitizen": "4.3.0",
     "cz-conventional-changelog": "3.3.0",
     "ethers": "6.12.0",
-    "hardhat": "2.22.2",
+    "hardhat": "2.22.3",
     "hardhat-gas-reporter": "1.0.10",
     "husky": "9.0.11",
     "ts-node": "10.9.2",
